@@ -109,6 +109,25 @@ try {
   $appBinary = Join-Path $repo 'target\release\meetily.exe'
   if (-not (Test-Path -LiteralPath $appBinary)) { throw "App binary missing: $appBinary" }
 
+  # --- DirectML beside the program, as the base's release installer has it -----
+  # The app's build script has just staged and verified ONNX Runtime under
+  # binaries\onnxruntime. The installer copies runtime-deps\DirectML.dll next to
+  # the executable ("Common local AI runtime"); without it the installer only
+  # warns, and the app loads the copy under binaries\onnxruntime.
+  $directMl = Join-Path $tauri 'binaries\onnxruntime\DirectML.dll'
+  if (-not (Test-Path -LiteralPath $directMl)) { throw "The app build did not stage ONNX Runtime: $directMl" }
+  Copy-Item -LiteralPath $directMl -Destination (Join-Path $deps 'DirectML.dll') -Force
+
+  # --- DLLs the program loads at start (for the build log) ---------------------
+  # vulkan-1.dll in this list means the app starts only where a graphics driver
+  # provides the Vulkan loader.
+  $dumpbin = Get-Command 'dumpbin.exe' -ErrorAction SilentlyContinue
+  if ($dumpbin) {
+    Write-Host ""
+    Write-Host "=== DLL imports of the app ==="
+    & $dumpbin.Source /nologo /dependents $appBinary | Where-Object { $_ -match '\.dll\s*$' } | ForEach-Object { Write-Host "  $($_.Trim())" }
+  }
+
   # --- Installer progress plugin ----------------------------------------------
   & (Join-Path $PSScriptRoot 'build-nsis-progress-plugin.ps1') -ProgressMainBinary $appBinary -MainBinaryName $mainBinary
   if ($LASTEXITCODE -ne 0) { throw 'NSIS overall-progress plugin build failed' }
@@ -125,7 +144,7 @@ try {
 $bundle = Join-Path $repo 'target\release\bundle\nsis'
 $installer = Get-ChildItem -LiteralPath $bundle -Filter '*-setup.exe' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $installer) { throw "No installer was produced in $bundle" }
-if ($installer.Length -lt 20MB) { throw "The installer is implausibly small: $($installer.Length) bytes" }
+if ($installer.Length -lt (20 * 1024 * 1024)) { throw "The installer is implausibly small: $($installer.Length) bytes" }
 
 $dist = Join-Path $repo 'dist-homebrew'
 New-Item -ItemType Directory -Force -Path $dist | Out-Null

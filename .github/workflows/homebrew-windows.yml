@@ -32,8 +32,8 @@ env:
 jobs:
   build:
     name: Build unsigned installer (x64, Vulkan)
-    # Pinned: this image ships Visual Studio 2022 and LLVM 18, which the
-    # whisper.cpp bindings need.
+    # Pinned: this image ships Visual Studio 2022. The build script fetches
+    # LLVM 18 (needed for the whisper.cpp bindings) if the image has another.
     runs-on: windows-2022
     timeout-minutes: 180
 
@@ -100,3 +100,10 @@ jobs:
             echo ""
             echo "Download the artifact \`meetily-homebrew-windows-x64-vulkan\` from this run."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # After the upload, so that a failure here leaves the installer
+      # downloadable. Installs it on this machine, checks the install folder,
+      # starts the app until its database exists, and removes it again.
+      - name: Smoke test (install, start, folders)
+        shell: pwsh
+        run: ./frontend/scripts/smoke-test-homebrew-windows.ps1

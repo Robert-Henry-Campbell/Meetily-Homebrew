@@ -88,9 +88,32 @@ The base's own `build-windows.yml` is not used: it is inherited from upstream,
 pins pnpm 8 against a lockfile it cannot read, and compiles the app before the
 frontend exists.
 
-State on 2026-11-24: the script and the workflow are written and reviewed
-against the base's maintained scripts. They have not run, because Actions was
-not enabled on the fork. The first run is the test.
+After the installer is uploaded, the workflow runs
+`frontend/scripts/smoke-test-homebrew-windows.ps1` on the build machine:
+
+1. Silent install (`/S`).
+2. The expected files are in `%LOCALAPPDATA%\Meetily-Homebrew`, the app is
+   registered for removal as "Meetily Homebrew", and no
+   `%LOCALAPPDATA%\Meetily-ActuallyFree` folder appeared.
+3. The app is started and has to create `data\meeting_minutes.sqlite` within
+   90 seconds. The window does that on a first start, so it shows that the
+   embedded frontend loaded in WebView2 and every migration applied.
+4. Silent uninstall.
+
+A failed smoke test turns the run red and leaves the installer downloadable.
+The script refuses to run on a machine where this app or a stock Meetily is
+installed.
+
+The build log also lists the DLLs the program loads at start
+("DLL imports of the app"). `vulkan-1.dll` in that list means the app starts
+only on a PC whose graphics driver provides the Vulkan loader; current AMD
+and Intel drivers do. The build machine has no graphics driver, so the smoke
+test borrows the loader from the Vulkan SDK.
+
+State on 2026-11-24: the build script, the smoke test and the workflow are
+written and reviewed against the base's maintained scripts. None of them has
+run: this repository's development environment is Linux without PowerShell,
+and Actions was not enabled on the fork. The first run is the test.
 
 The installer is unsigned. Windows SmartScreen shows "Windows protected your
 PC"; choose "More info", then "Run anyway". The first start downloads about
