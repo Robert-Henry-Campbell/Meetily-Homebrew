@@ -1,8 +1,9 @@
 {
     "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-    "productName": "Meetily - Actually Free",
+    "productName": "Meetily Homebrew",
+    "mainBinaryName": "meetily-homebrew",
     "version": "0.2.23",
-    "identifier": "com.meetily.ai",
+    "identifier": "com.meetily.homebrew",
     "build": {
         "frontendDist": "../out",
         "devUrl": "http://localhost:3118",
@@ -12,7 +13,7 @@
     "app": {
         "windows": [
             {
-                "title": "Meetily - Actually Free",
+                "title": "Meetily Homebrew",
                 "url": "/",
                 "width": 1280,
                 "height": 760,
@@ -144,7 +145,7 @@
         "updater": {
             "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc1MjA0M0FCMkRCNzM2QUIKUldTck5yY3RxME1nZFZmNTlaSFpLYVYxelh1RFp6cE9lOFZ2VkE0VlFXdThWUzRUK091c2ZQQ3AK",
             "endpoints": [
-                "https://github.com/TylerBuza/Meetily-ActuallyFree/releases/latest/download/latest.json"
+                "https://github.com/Robert-Henry-Campbell/Meetily-Homebrew/releases/latest/download/latest.json"
             ]
         }
     }

@@ -415,7 +415,9 @@ Var MeetilyCudaNotice
 
 !macro NSIS_HOOK_PREUNINSTALL
   DetailPrint "Stopping Meetily if it is still running…"
-  nsExec::ExecToLog 'taskkill /IM meetily.exe /F'
+  ; Only this app's own executable. A stock Meetily installed beside it runs as
+  ; meetily.exe and must not be stopped by this uninstaller.
+  nsExec::ExecToLog 'taskkill /IM ${MAINBINARYNAME}.exe /F'
   Pop $0
 !macroend
 

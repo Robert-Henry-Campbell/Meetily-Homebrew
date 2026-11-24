@@ -1,6 +1,8 @@
 param(
   [Parameter(Mandatory = $true)]
-  [string]$ProgressMainBinary
+  [string]$ProgressMainBinary,
+  # The installed name of the main executable (tauri.conf.json mainBinaryName).
+  [string]$MainBinaryName = "meetily.exe"
 )
 
 $ErrorActionPreference = "Stop"
@@ -38,7 +40,7 @@ function Add-ProgressFile([string]$RelativePath, [string]$SourcePath) {
     $files.Add([PSCustomObject]@{ RelativePath = $RelativePath; Length = (Get-Item -LiteralPath $SourcePath).Length })
   }
 }
-Add-ProgressFile "meetily.exe" $ProgressMainBinary
+Add-ProgressFile $MainBinaryName $ProgressMainBinary
 foreach ($name in @(".gitkeep", "meetily-cpu.exe", "meetily-cuda.exe", "meetily-vulkan-probe.exe", "meetily-vulkan.exe", "universal.marker")) {
   Add-ProgressFile "installer-variants\$name" (Join-Path $tauri "installer-variants\$name")
 }

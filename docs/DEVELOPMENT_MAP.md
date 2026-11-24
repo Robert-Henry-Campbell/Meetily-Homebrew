@@ -218,6 +218,11 @@ Recordings are matched to Google Calendar events (read only) by
 background loop. Read [HOMEBREW_CALENDAR.md](HOMEBREW_CALENDAR.md) before
 changing it; the note also records why upstream PR #666 was not ported.
 
+The `homebrew` branch is a separate app (own name, identifier, executable and
+data folder) with updates switched off. Read
+[HOMEBREW_BUILD.md](HOMEBREW_BUILD.md) before changing its identity or its
+Windows installer workflow.
+
 ## 4. Optional download ownership and UI synchronization
 
 ### October integration interfaces

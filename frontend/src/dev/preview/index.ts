@@ -327,10 +327,21 @@ let storeRid = 1;
 function handle(cmd: string, args: Args): unknown {
   const liveResult = handleLiveCommand(cmd, args);
   if (liveResult !== undefined) return liveResult;
-  // @tauri-apps/plugin-store: an empty store that accepts writes.
+  // @tauri-apps/plugin-store: a store that keeps its values in the browser, so a
+  // choice made in one preview page (the recording notice) holds on the next.
   if (cmd.startsWith('plugin:store|')) {
     if (cmd === 'plugin:store|load' || cmd === 'plugin:store|get_store') return storeRid++;
-    if (cmd === 'plugin:store|get') return [null, false];
+    if (cmd === 'plugin:store|set') {
+      try { localStorage.setItem(`preview-store:${args.key}`, JSON.stringify(args.value)); } catch { /* storage unavailable */ }
+      return null;
+    }
+    if (cmd === 'plugin:store|get') {
+      try {
+        const stored = localStorage.getItem(`preview-store:${args.key}`);
+        if (stored !== null) return [JSON.parse(stored), true];
+      } catch { /* storage unavailable */ }
+      return [null, false];
+    }
     if (cmd === 'plugin:store|has') return false;
     if (cmd === 'plugin:store|keys' || cmd === 'plugin:store|values' || cmd === 'plugin:store|entries') return [];
     if (cmd === 'plugin:store|length') return 0;
@@ -857,16 +868,108 @@ function handle(cmd: string, args: Args): unknown {
       return new Promise((resolve) =>
         setTimeout(() => resolve('This is a preview answer. In the app, your configured model answers from the meeting records, with citations.'), 700),
       );
+    // ---- Connections, Drive export, calendar (homebrew) --------------------
+    case 'google_connection_status':
+      return connections.google;
+    case 'google_save_client':
+      connections.google = { ...connections.google, clientConfigured: true, clientIdHint: '12345678….apps.googleusercontent.com' };
+      return connections.google;
+    case 'google_sign_in':
+      connections.google = {
+        ...connections.google, clientConfigured: true, clientIdHint: '12345678….apps.googleusercontent.com',
+        connected: true, accountEmail: 'you@example.com', driveGranted: true, calendarGranted: true, needsAttention: null,
+      };
+      return new Promise((resolve) => setTimeout(() => resolve(connections.google), 900));
+    case 'google_disconnect':
+      connections.google = { ...connections.google, connected: false, accountEmail: null, driveGranted: false, calendarGranted: false };
+      return connections.google;
+    case 'google_remove_client':
+      connections.google = { ...connections.google, clientConfigured: false, clientIdHint: null, connected: false, accountEmail: null, driveGranted: false, calendarGranted: false };
+      return connections.google;
+    case 'google_test_connection':
+      return { drive: { ok: true, message: 'Drive works.' }, calendar: { ok: true, message: 'Calendar works.' } };
+    case 'drive_export_settings':
+      return connections.drive;
+    case 'drive_export_save_settings':
+      connections.drive = { ...connections.drive, ...args };
+      return connections.drive;
+    case 'drive_export_status':
+    case 'drive_export_send_now':
+      if (!connections.google.connected) {
+        return { state: 'not-connected', message: null, summaryLink: null, transcriptLink: null, folderLink: null, exportedAt: null };
+      }
+      return {
+        state: 'sent', message: null,
+        summaryLink: 'https://drive.google.com/file/d/preview-summary/view',
+        transcriptLink: 'https://drive.google.com/file/d/preview-transcript/view',
+        folderLink: 'https://drive.google.com/drive/folders/preview-folder',
+        exportedAt: Math.floor(Date.now() / 1000) - 600,
+      };
+    case 'calendar_options':
+      return connections.calendar;
+    case 'calendar_save_options':
+      connections.calendar = {
+        matching: args.matching,
+        calendars: connections.calendar.calendars.map((calendar) => ({ ...calendar, selected: (args.calendarIds ?? []).includes(calendar.id) })),
+      };
+      return null;
+    case 'meeting_suggested_participants':
+      return ['Priya Raman'];
+    case 'claude_status':
+      return connections.claude;
+    case 'claude_models':
+      return [
+        { id: 'claude-opus-5-5', display_name: 'Claude Opus 5.5' },
+        { id: 'claude-sonnet-5-5', display_name: 'Claude Sonnet 5.5' },
+        { id: 'claude-haiku-5-5', display_name: 'Claude Haiku 5.5' },
+      ];
+    case 'claude_check_key':
+      return new Promise((resolve) => setTimeout(() => resolve({ ok: true, message: `The key works with ${args.model}.` }), 700));
+    case 'claude_connect':
+      connections.claude = { keySaved: true, keyHint: '…WXYZ', selected: true, model: args.model };
+      return connections.claude;
+    case 'claude_remove_key':
+      connections.claude = { keySaved: false, keyHint: null, selected: false, model: 'claude-opus-5-5' };
+      return connections.claude;
+    case 'post_call_jobs_unfinished':
+    case 'meeting_participants_get':
+    case 'meeting_speaker_labels':
+      return [];
     default:
       return null;
   }
 }
+
+/** Preview state of the Connections screen. `?preview=google` starts signed in. */
+const connections = {
+  google: {
+    clientConfigured: false, clientIdHint: null as string | null, connected: false, accountEmail: null as string | null,
+    driveGranted: false, calendarGranted: false, needsAttention: null as string | null,
+  },
+  drive: { autoExport: true, folderPerPerson: true, rootFolderName: 'Meetily meetings', enabledSince: 1 as number | null },
+  calendar: {
+    matching: true,
+    calendars: [
+      { id: 'you@example.com', name: 'you@example.com', primary: true, selected: true },
+      { id: 'team@group.calendar.google.com', name: 'Team', primary: false, selected: false },
+      { id: 'family@group.calendar.google.com', name: 'Family', primary: false, selected: false },
+    ],
+  },
+  claude: { keySaved: false, keyHint: null as string | null, selected: false, model: 'claude-opus-5-5' },
+};
 
 let installed = false;
 
 export function installPreviewMocks() {
   if (installed || typeof window === 'undefined' || '__TAURI_INTERNALS__' in window) return;
   installed = true;
+  if (new URLSearchParams(window.location.search).get('preview') === 'google') {
+    connections.google = {
+      clientConfigured: true, clientIdHint: '12345678….apps.googleusercontent.com', connected: true,
+      accountEmail: 'you@example.com', driveGranted: true, calendarGranted: true, needsAttention: null,
+    };
+    connections.claude = { keySaved: true, keyHint: '…WXYZ', selected: true, model: 'claude-opus-5-5' };
+  }
   // A hidden preview pane pauses animation frames, which would freeze
   // entrance animations mid-way in screenshots. Previews skip them.
   MotionGlobalConfig.skipAnimations = true;

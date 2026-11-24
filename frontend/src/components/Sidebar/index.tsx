@@ -341,7 +341,7 @@ const Sidebar: React.FC = () => {
                 )}
               >
                 <span className="whitespace-nowrap text-base font-bold tracking-tight text-blue-500">
-                  Meetily <span className="text-blue-400/70">· Actually Free</span>
+                  Meetily <span className="text-blue-400/70">· Homebrew</span>
                 </span>
               </button>
             </DialogTrigger>

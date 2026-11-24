@@ -8,6 +8,9 @@
 import { check } from '@tauri-apps/plugin-updater';
 import { getVersion } from '@tauri-apps/api/app';
 
+/** False in the homebrew build; see `checkForUpdates`. */
+const UPDATES_ENABLED = false;
+
 export interface UpdateInfo {
   available: boolean;
   currentVersion: string;
@@ -38,6 +41,14 @@ export class UpdateService {
    * @returns Promise with update information
    */
   async checkForUpdates(force = false): Promise<UpdateInfo> {
+    // This personal build is installed from its own installer and has no
+    // release feed. Updates are never looked for: a feed of the base project
+    // would replace this app with the stock one, whose database lacks the
+    // tables this build adds.
+    if (!UPDATES_ENABLED) {
+      return { available: false, currentVersion: await getVersion() };
+    }
+
     // Prevent concurrent update checks
     if (this.updateCheckInProgress) {
       throw new Error('Update check already in progress');

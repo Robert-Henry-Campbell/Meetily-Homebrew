@@ -33,10 +33,10 @@ use std::sync::Once;
 
 /// Stable AppUserModelID for this app. This must match `tauri.conf.json`'s
 /// identifier and the AUMID written to installer-created shortcuts.
-pub const APP_USER_MODEL_ID: &str = "com.meetily.ai";
+pub const APP_USER_MODEL_ID: &str = "com.meetily.homebrew";
 
 /// Friendly name Windows shows as the toast's source.
-const DISPLAY_NAME: &str = "Meetily - Actually Free";
+const DISPLAY_NAME: &str = "Meetily Homebrew";
 
 /// App icon embedded at compile time so `IconUri` always has a real file to
 /// point at, regardless of how the portable app was unpacked. Path is relative

@@ -194,10 +194,10 @@ fn windows_cuda_reconfiguration_status() -> CudaReconfigurationStatus {
                 | CudaDriverState::QueryFailed
         ),
         reconfiguration_required: driver_state == CudaDriverState::Ready && !cuda_compiled,
-        setup_download_url: Some(format!(
-            "https://github.com/TylerBuza/Meetily-ActuallyFree/releases/download/v{version}/Meetily-ActuallyFree-{version}-x64-universal-setup.exe",
-            version = env!("CARGO_PKG_VERSION"),
-        )),
+        // This personal build has one variant (Vulkan) and no release feed. The
+        // base project's universal installer would install the stock app, so
+        // no download is offered.
+        setup_download_url: None,
     }
 }
 

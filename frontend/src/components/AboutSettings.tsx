@@ -38,7 +38,7 @@ export function AboutSettings() {
         <div className="flex items-center gap-4">
           <Image src="/logo-collapsed.png" alt="Meetily" width={56} height={56} className="h-14 w-14 shrink-0 rounded-2xl shadow-sm" />
           <div>
-            <h3 className="text-lg font-semibold text-af-text">Meetily · Actually Free</h3>
+            <h3 className="text-lg font-semibold text-af-text">Meetily · Homebrew</h3>
             <p className="text-sm text-af-text-2">
               Version {version} · Privacy-first, on-device meeting assistant
             </p>
@@ -102,6 +102,11 @@ export function AboutSettings() {
           · MIT licensed
         </p>
         <p>
+          Personal build: automatic processing after Stop, Google Drive export, Google Calendar matching. It does not update
+          itself.
+        </p>
+        <p>
+          Based on the{" "}
           <button
             type="button"
             onClick={() => openUrl(AUTHOR_URL)}
