@@ -17,6 +17,7 @@ import {
   type GoogleCheck,
   type GoogleStatus,
 } from '@/lib/connections';
+import { CalendarOptions } from './CalendarOptions';
 import { DriveExportOptions } from './DriveExportOptions';
 import { GoogleSetupGuide } from './GoogleSetupGuide';
 
@@ -108,6 +109,7 @@ export function GoogleCard({ openGuideInitially = false }: { openGuideInitially?
       )}
 
       {status.connected && status.driveGranted && <DriveExportOptions />}
+      {status.connected && status.calendarGranted && !status.needsAttention && <CalendarOptions />}
 
       {check && (
         <ul className="mt-3 space-y-1 text-[13px]" aria-label="Test results">

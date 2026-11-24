@@ -36,6 +36,7 @@ import { announceChange } from '@/lib/workspace-api';
 import { OPTIONAL_WHISPER_MODEL } from '@/lib/optional-model-activation';
 import {
   getMeetingParticipants,
+  getSuggestedParticipants,
   parseParticipantNames,
   savePostCallJob,
   setMeetingParticipants,
@@ -613,8 +614,9 @@ export function PostCallProcessingWorker({
     }
     setStage('prompt');
     void savePostCallJob({ meetingId, stage: 'prompt', folderPath: meetingFolderPath ?? null });
-    // Names known before the question (an earlier answer, a calendar match).
-    void getMeetingParticipants(meetingId).then((names) => {
+    // Names known before the question: an earlier answer, or the people invited
+    // to the calendar event of this recording. The user can change them.
+    void getSuggestedParticipants(meetingId).then((names) => {
       if (names.length && !namesEdited.current) setParticipantNames(names.join(', '));
     });
     // The resume record is read once, when the job is created.

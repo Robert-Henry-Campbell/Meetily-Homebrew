@@ -8,7 +8,14 @@ const mount = async () => { await act(async () => { root = create(<GoogleCard />
 const field = (label: string) => root.root.findByProps({ 'aria-label': label });
 
 const DRIVE_OPTIONS = { autoExport: true, folderPerPerson: true, rootFolderName: 'Meetily meetings', enabledSince: 1 };
-beforeEach(() => reset({ google_connection_status: () => NOT_CONNECTED, open_external_url: () => undefined, drive_export_settings: () => DRIVE_OPTIONS }));
+const CALENDARS = { matching: true, calendars: [
+  { id: 'me@example.com', name: 'me@example.com', primary: true, selected: true },
+  { id: 'team@group.calendar.google.com', name: 'Team', primary: false, selected: false },
+] };
+beforeEach(() => reset({
+  google_connection_status: () => NOT_CONNECTED, open_external_url: () => undefined,
+  drive_export_settings: () => DRIVE_OPTIONS, calendar_options: () => CALENDARS,
+}));
 afterEach(async () => { await act(async () => root?.unmount()); });
 
 test('an unconnected card offers the guide, whose buttons open the Google Cloud pages for each step', async () => {
@@ -86,6 +93,7 @@ test('signing in waits for the browser, then tests both services and shows each 
     google_sign_in: () => new Promise((resolve) => { finish = resolve; }),
     google_cancel_sign_in: () => undefined,
     drive_export_settings: () => DRIVE_OPTIONS,
+    calendar_options: () => CALENDARS,
     google_test_connection: () => ({
       drive: { ok: true, message: 'Drive works.' },
       calendar: { ok: false, message: 'This API is not enabled in your Google Cloud project (step 1).' },
@@ -131,6 +139,7 @@ test('a connected card shows the account and permissions, can be tested, and dis
   reset({
     google_connection_status: () => ({ ...CONNECTED, calendarGranted: false }),
     drive_export_settings: () => DRIVE_OPTIONS,
+    calendar_options: () => CALENDARS,
     google_test_connection: () => ({ drive: { ok: true, message: 'Drive works.' }, calendar: { ok: false, message: 'The Calendar permission was not ticked.' } }),
     google_disconnect: () => CLIENT_ONLY,
   });
@@ -159,6 +168,7 @@ test('a sign-in that Google ended is shown as needing attention, with one button
   reset({
     google_connection_status: () => ({ ...CONNECTED, needsAttention: 'Google ended this sign-in (it expired or access was removed). Sign in again.' }),
     drive_export_settings: () => DRIVE_OPTIONS,
+    calendar_options: () => CALENDARS,
   });
   await mount();
   expect(text(root)).toContain('Needs attention');
@@ -174,4 +184,49 @@ test('a change made elsewhere reaches the open card', async () => {
   expect(text(root)).toContain('Signed in as person@example.com');
   // No command returned or displayed a token or secret at any point.
   expect(JSON.stringify(calls)).not.toMatch(/refresh|access_token|GOCSPX/);
+});
+
+test('calendars are listed once Calendar may be used, and ticking one saves the choice', async () => {
+  let saved: any = null;
+  reset({
+    google_connection_status: () => CONNECTED,
+    drive_export_settings: () => DRIVE_OPTIONS,
+    calendar_options: () => CALENDARS,
+    calendar_save_options: (args) => { saved = args; },
+  });
+  await mount();
+  expect(text(root)).toContain('Match recordings to calendar events');
+  expect(text(root)).toContain('Events are only read');
+  const boxes = root.root.findAllByProps({ type: 'checkbox' });
+  expect(boxes.map((box) => box.props.checked)).toEqual([true, false]);
+  await act(async () => boxes[1].props.onChange({ target: { checked: true } }));
+  await flush();
+  expect(saved).toEqual({ matching: true, calendarIds: ['me@example.com', 'team@group.calendar.google.com'] });
+
+  // Switched off: the list is hidden and nothing is matched.
+  await act(async () => root.root.findByProps({ role: 'switch', 'aria-label': 'Match recordings to calendar events' }).props.onClick());
+  await flush();
+  expect(saved.matching).toBe(false);
+  expect(root.root.findAllByProps({ type: 'checkbox' })).toHaveLength(0);
+});
+
+test('a calendar list that cannot be read says why and can be tried again', async () => {
+  let fail = true;
+  reset({
+    google_connection_status: () => CONNECTED,
+    drive_export_settings: () => DRIVE_OPTIONS,
+    calendar_options: () => { if (fail) throw new Error('The Google Calendar API is not enabled in your Google Cloud project (step 1 of the setup guide).'); return CALENDARS; },
+  });
+  await mount();
+  expect(text(root)).toContain('step 1 of the setup guide');
+  fail = false;
+  await click(root, 'Try again');
+  await flush();
+  expect(root.root.findAllByProps({ type: 'checkbox' })).toHaveLength(2);
+
+  // Without the Calendar permission the options are not offered at all.
+  reset({ google_connection_status: () => ({ ...CONNECTED, calendarGranted: false }), drive_export_settings: () => DRIVE_OPTIONS });
+  await act(async () => root.unmount());
+  await mount();
+  expect(text(root)).not.toContain('Match recordings to calendar events');
 });

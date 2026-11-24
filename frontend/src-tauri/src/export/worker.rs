@@ -300,6 +300,10 @@ pub fn spawn<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
             }
             let Some(app_state) = app.try_state::<crate::state::AppState>() else { continue };
             let context = ExportContext { pool: app_state.db_manager.pool(), http: &http, endpoints: &endpoints, to_local: local_time };
+            // Calendar first: a match found now already decides this pass's folder.
+            for meeting_id in crate::calendar::worker::pass(&context, Utc::now().timestamp()).await {
+                let _ = app.emit(crate::calendar::CALENDAR_LINK_CHANGED, serde_json::json!({ "meetingId": meeting_id }));
+            }
             for meeting_id in pass(&context, Utc::now().timestamp()).await {
                 let _ = app.emit(DRIVE_EXPORT_CHANGED, serde_json::json!({ "meetingId": meeting_id }));
             }

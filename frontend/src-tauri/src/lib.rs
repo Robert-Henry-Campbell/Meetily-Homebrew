@@ -37,6 +37,7 @@ pub mod analytics;
 pub mod api;
 pub mod app_update;
 pub mod audio;
+pub mod calendar;
 pub mod claude_cli;
 pub mod config;
 pub mod console_utils;
@@ -825,6 +826,11 @@ pub fn run() {
             google::commands::google_cancel_sign_in,
             google::commands::google_disconnect,
             google::commands::google_test_connection,
+            calendar::commands::calendar_options,
+            calendar::commands::calendar_save_options,
+            calendar::commands::calendar_link,
+            calendar::commands::calendar_match_meeting,
+            calendar::commands::meeting_suggested_participants,
             export::commands::drive_export_status,
             export::commands::drive_export_send_now,
             export::commands::drive_export_settings,

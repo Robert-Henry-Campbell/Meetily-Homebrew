@@ -94,6 +94,21 @@ export async function getMeetingParticipants(meetingId: string): Promise<string[
   }
 }
 
+/**
+ * Names to offer at "Who was on the call?": what was typed before, or else the
+ * people invited to the calendar event of this recording. The event is looked
+ * up now if the background pass has not done so yet; the native call is
+ * bounded and returns nothing when Google is not connected.
+ */
+export async function getSuggestedParticipants(meetingId: string): Promise<string[]> {
+  try {
+    await invoke('calendar_match_meeting', { meetingId }).catch(() => undefined);
+    return (await invoke<string[]>('meeting_suggested_participants', { meetingId })) ?? [];
+  } catch {
+    return [];
+  }
+}
+
 const isGenericRemoteLabel = (label: string) => /^(speaker(\s+\d+)?|guest)$/i.test(label.trim());
 
 /**

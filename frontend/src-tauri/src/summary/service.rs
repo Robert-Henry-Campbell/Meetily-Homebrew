@@ -356,6 +356,10 @@ impl SummaryService {
         };
         let cancellation_token = registration.token.clone();
         let start_time = Instant::now();
+        // The matched calendar event (title, who was invited) is context for the
+        // summary, alongside whatever the user typed. It is part of the prompt
+        // fingerprint below, so a later match is not served a stale cache.
+        let custom_prompt = crate::calendar::state::with_summary_context(&pool, &meeting_id, custom_prompt).await;
         info!(
             "Starting background processing for meeting_id: {}",
             meeting_id

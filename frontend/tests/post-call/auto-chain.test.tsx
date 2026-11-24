@@ -126,9 +126,25 @@ test('several names are never assigned to speaker numbers', async () => {
 });
 
 test('names already known for the meeting are offered in the question', async () => {
-  readyMachine({ meeting_participants_get: () => ['Dana Lee'] });
+  // The calendar event of the recording is looked up first; its invitees are offered.
+  readyMachine({ calendar_match_meeting: () => ({ status: 'matched' }), meeting_suggested_participants: () => ['Dana Lee'] });
   await act(async () => { root = create(<App />); });
+  await wait(5);
   expect(root.root.findByProps({ 'aria-label': 'Names of the other people on the call' }).props.value).toBe('Dana Lee');
+  const order = calls.map(([name]) => name).filter(name => name.startsWith('calendar_') || name === 'meeting_suggested_participants');
+  expect(order).toEqual(['calendar_match_meeting', 'meeting_suggested_participants']);
+  // Continuing with the offered names stores them, so they also name the Drive folder.
+  await act(async () => button('Continue')!.props.onClick());
+  expect(named('meeting_participants_set')[0][1]).toEqual({ meetingId: 'a', names: ['Dana Lee'] });
+});
+
+test('a calendar lookup that fails does not hold up the question', async () => {
+  readyMachine({ calendar_match_meeting: () => { throw new Error('Google Calendar could not be reached.'); } });
+  await act(async () => { root = create(<App />); });
+  await wait(5);
+  expect(root.root.findByProps({ 'aria-label': 'Names of the other people on the call' }).props.value).toBe('');
+  await act(async () => button('Continue')!.props.onClick());
+  expect(named('start_retranscription_command')).toHaveLength(1);
 });
 
 test('a missing post-call model is not replaced by a smaller one; the live transcript is kept and marked', async () => {

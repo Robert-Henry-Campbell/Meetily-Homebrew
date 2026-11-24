@@ -213,6 +213,11 @@ worker whose queue is the table `drive_export_state`, fed by SQLite triggers.
 Read [HOMEBREW_DRIVE_EXPORT.md](HOMEBREW_DRIVE_EXPORT.md) before changing
 `src-tauri/src/export/`, `google/drive.rs`, or a table those triggers watch.
 
+Recordings are matched to Google Calendar events (read only) by
+`src-tauri/src/calendar/`, queued by a trigger and looked up by the same
+background loop. Read [HOMEBREW_CALENDAR.md](HOMEBREW_CALENDAR.md) before
+changing it; the note also records why upstream PR #666 was not ported.
+
 ## 4. Optional download ownership and UI synchronization
 
 ### October integration interfaces
