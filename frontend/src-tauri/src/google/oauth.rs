@@ -520,7 +520,9 @@ pub async fn access_token(pool: &SqlitePool, http: &reqwest::Client, endpoints: 
             // `invalid_grant`: the sign-in expired or was revoked. `invalid_client`:
             // the client was deleted or changed. Neither heals by waiting.
             let reason = match failure.code.as_str() {
-                "invalid_grant" => "Google ended this sign-in (it expired or access was removed). Sign in again.".to_string(),
+                // The usual cause for a personal registration: its status in
+                // Google Cloud is "Testing", which limits a sign-in to 7 days.
+                "invalid_grant" => "Google ended this sign-in (it expired or access was removed). Sign in again. A Google Cloud app in \"Testing\" is signed out every 7 days.".to_string(),
                 "invalid_client" | "unauthorized_client" | "deleted_client" => "Google no longer accepts the imported client. Check it in Google Cloud and import it again.".to_string(),
                 _ => format!("Google rejected the stored sign-in. {} Sign in again.", failure.message),
             };
@@ -866,6 +868,7 @@ pub(crate) mod tests {
         let pool = manager.pool();
         let first = access_token(pool, &test_http(), &google.endpoints).await.unwrap_err();
         assert!(matches!(&first, AccessError::NeedsAttention(reason) if reason.contains("Sign in again")));
+        assert!(matches!(&first, AccessError::NeedsAttention(reason) if reason.contains("signed out every 7 days")));
         let state = status(pool).await.unwrap();
         assert!(state.connected);
         assert!(state.needs_attention.unwrap().contains("Sign in again"));

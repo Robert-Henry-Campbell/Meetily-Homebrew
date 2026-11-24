@@ -155,13 +155,20 @@ export function GoogleSetupGuide({
             </div>
           </Step>
 
-          <Step number={2} title="Set up the consent screen and publish it">
+          <Step number={2} title="Set up the consent screen and add yourself as a test user">
             <p>
               Open Branding and choose <strong>Get started</strong>. Enter an app name and your email address, choose the audience{' '}
-              <strong>External</strong>, enter your email address again, accept the policy and choose <strong>Create</strong>.
+              <strong>External</strong>, enter your email address again, accept the policy and choose <strong>Create</strong>. Leave
+              the app domain links and the authorized domains empty.
             </p>
             <p>
-              Then open Audience and choose <strong>Publish app</strong>. Without this, Google ends the sign-in every 7 days.
+              Then open Audience. Under <strong>Test users</strong> choose <strong>Add users</strong> and enter your own Google
+              address; while the status is &quot;Testing&quot;, only listed test users can sign in.
+            </p>
+            <p>
+              In &quot;Testing&quot;, Google ends the sign-in every 7 days. Meetily then asks you to sign in again, and meetings
+              recorded in between are sent afterwards. <strong>Publish app</strong> removes that limit, but Google offers it only
+              once Branding has a public home page and a privacy policy on a domain you own.
             </p>
             <div className="flex flex-wrap gap-2">
               <OpenButton url={GOOGLE_CLOUD_LINKS.branding}>Open Branding</OpenButton>

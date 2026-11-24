@@ -25,13 +25,17 @@ test('an unconnected card offers the guide, whose buttons open the Google Cloud 
 
   await click(root, 'Connect Google');
   const guide = text(root);
-  for (const title of ['Create a project and switch on two services', 'Set up the consent screen and publish it', 'Create a Desktop client and import it here', 'Sign in with Google']) {
+  for (const title of ['Create a project and switch on two services', 'Set up the consent screen and add yourself as a test user', 'Create a Desktop client and import it here', 'Sign in with Google']) {
     expect(guide).toContain(title);
   }
   // The points that are easy to get wrong are stated.
   expect(guide).toContain('Desktop app');
-  expect(guide).toContain('Publish app');
+  expect(guide).toContain('Test users');
+  expect(guide).toContain('Leave the app domain links and the authorized domains empty');
   expect(guide).toContain('every 7 days');
+  // Publishing is named with what Google wants for it, not as a step to take.
+  expect(guide).toContain('Publish app');
+  expect(guide).toContain('a public home page and a privacy policy on a domain you own');
   expect(guide).toContain('only the files it creates itself');
   expect(guide).toContain('read only');
 
@@ -166,7 +170,7 @@ test('a connected card shows the account and permissions, can be tested, and dis
 
 test('a sign-in that Google ended is shown as needing attention, with one button to fix it', async () => {
   reset({
-    google_connection_status: () => ({ ...CONNECTED, needsAttention: 'Google ended this sign-in (it expired or access was removed). Sign in again.' }),
+    google_connection_status: () => ({ ...CONNECTED, needsAttention: 'Google ended this sign-in (it expired or access was removed). Sign in again. A Google Cloud app in "Testing" is signed out every 7 days.' }),
     drive_export_settings: () => DRIVE_OPTIONS,
     calendar_options: () => CALENDARS,
   });

@@ -12,8 +12,13 @@ their own OAuth client ("Desktop app") in Google Cloud once. The card's guide
 Google Cloud page it needs:
 
 1. Create a project; enable the Drive API and the Calendar API.
-2. Consent screen: app name, audience External, then "Publish app". An
-   unpublished (Testing) registration ends the sign-in every 7 days.
+2. Consent screen: app name, audience External, the app domain links left
+   empty; then the user's own address under Audience, "Test users". The
+   registration stays in "Testing", where Google ends the sign-in every
+   7 days and only listed test users can sign in. "Publish app" removes the
+   limit, but Google offers it only once Branding has a public home page and
+   a privacy policy on a domain the user owns. The app's message for an ended
+   sign-in names the 7-day rule.
 3. Create a "Desktop app" client; import the downloaded JSON file, or paste
    the two values. The values are checked (`google/config.rs`); a "Web
    application" client is rejected with the reason.

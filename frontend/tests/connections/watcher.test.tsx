@@ -5,7 +5,7 @@ import { CONNECTED, flush, named, nativeListeners, pushed, reset, text, toasts }
 const { ConnectionsWatcher } = await import('../../src/components/connections/ConnectionsWatcher');
 const { ConnectionsBanner } = await import('../../src/components/connections/ConnectionsBanner');
 let root: ReactTestRenderer;
-const ENDED = 'Google ended this sign-in (it expired or access was removed). Sign in again.';
+const ENDED = 'Google ended this sign-in (it expired or access was removed). Sign in again. A Google Cloud app in "Testing" is signed out every 7 days.';
 const emit = (payload: unknown) => act(async () => nativeListeners.get('google-connection-changed')!({ payload }));
 
 beforeEach(() => reset({ google_connection_status: () => CONNECTED, set_user_display_name: () => undefined }));
