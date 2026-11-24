@@ -12,6 +12,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useSidebar } from '@/components/Sidebar/SidebarProvider';
 import { usePermissionCheck } from '@/hooks/usePermissionCheck';
 import { PermissionWarning } from '@/components/PermissionWarning';
+import { ConnectionsBanner } from '@/components/connections/ConnectionsBanner';
 import { listActionItems, onWorkspaceChange, type ActionItem } from '@/lib/workspace-api';
 import { upcomingGroupMeetings } from '@/lib/schedule';
 import { formatRelativeFuture, formatWhen, parseDate } from '@/lib/dates';
@@ -104,6 +105,7 @@ export function HomeDashboard() {
             className="mb-10"
           />
         )}
+        <ConnectionsBanner className="mb-10" />
 
         <div className="af-appear text-center">
           <p className="text-7xl font-extralight tracking-tight text-af-text/85 tabular-nums">{time}</p>

@@ -56,6 +56,8 @@ mod onnx_runtime_build_tests;
 pub mod openai;
 pub mod anthropic;
 pub mod groq;
+pub mod google;
+pub mod integrations;
 pub mod openrouter;
 pub mod live_assistant;
 pub mod meeting_detection;
@@ -811,6 +813,18 @@ pub fn run() {
             post_call::meeting_participants_set,
             post_call::meeting_participants_get,
             post_call::meeting_speaker_labels,
+            google::commands::google_connection_status,
+            google::commands::google_save_client,
+            google::commands::google_remove_client,
+            google::commands::google_sign_in,
+            google::commands::google_cancel_sign_in,
+            google::commands::google_disconnect,
+            google::commands::google_test_connection,
+            summary::claude_commands::claude_status,
+            summary::claude_commands::claude_models,
+            summary::claude_commands::claude_check_key,
+            summary::claude_commands::claude_connect,
+            summary::claude_commands::claude_remove_key,
             api::api_get_meeting_audio,
             meeting_detection::get_meeting_detection_settings,
             meeting_detection::set_meeting_detection_settings,

@@ -15,8 +15,10 @@ import { useConfig } from '@/contexts/ConfigContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { TemplateEditorModal } from '@/components/MeetingDetails/TemplateEditorModal';
 import { MeetingExportDialog } from '@/components/MeetingDetails/MeetingExportDialog';
+import { useRouter } from 'next/navigation';
 import { PostCallProcessingDialog } from '@/components/MeetingDetails/PostCallProcessingDialog';
 import { PostCallNotice } from '@/components/MeetingDetails/PostCallNotice';
+import { CONNECTIONS_ROUTE } from '@/lib/connections';
 import { ModelConfig } from '@/components/ModelSettingsModal';
 import { VirtualizedTranscriptView } from '@/components/VirtualizedTranscriptView';
 import { MeetingHeader } from '@/components/meeting/MeetingHeader';
@@ -194,7 +196,7 @@ export default function PageContent({
     [meetingData.setAiSummary, onSummaryReady],
   );
 
-  const openModelSettingsRef = useRef<(() => void) | null>(null);
+  const router = useRouter();
   const summaryGeneration = useSummaryGeneration({
     meeting,
     transcripts: meetingData.transcripts,
@@ -203,7 +205,9 @@ export default function PageContent({
     selectedTemplate: templates.selectedTemplate,
     onMeetingUpdated,
     setAiSummary,
-    onOpenModelSettings: () => openModelSettingsRef.current?.(),
+    // Where the failing setting can be fixed: the Claude key lives under
+    // Connections, every other summary model under Summaries.
+    onOpenModelSettings: () => router.push(modelConfig.provider === 'claude' ? CONNECTIONS_ROUTE : '/settings?section=summaries'),
     // New summaries are written from the clean text when Labs asks for it.
     cleanText: labs.cleanTranscript ? cleanTranscriptText : undefined,
   });

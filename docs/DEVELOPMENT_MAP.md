@@ -202,6 +202,12 @@ unfinished jobs resume at launch, and the job owner starts the summary instead
 of the meeting page. Read [HOMEBREW_AUTO_CHAIN.md](HOMEBREW_AUTO_CHAIN.md)
 before changing the worker, the job owner, or `src-tauri/src/post_call.rs`.
 
+Google sign-in (Drive, Calendar) and the checked Claude key live in the
+Connections settings section. Secrets stay native in `integration_config`.
+Read [HOMEBREW_CONNECTIONS.md](HOMEBREW_CONNECTIONS.md) before changing
+`src-tauri/src/google/`, `src-tauri/src/integrations/`, or
+`summary/claude_commands.rs`.
+
 ## 4. Optional download ownership and UI synchronization
 
 ### October integration interfaces

@@ -25,8 +25,10 @@ pub const DEFAULT_CLAUDE_MODEL: &str = "claude-opus-5-5";
 /// on the model Anthropic recommends for that case, inside the same call.
 const REFUSAL_FALLBACK_BETA: &str = "server-side-fallback-2026-07-01";
 
-/// Attempts per request, counting the first. Only transient failures repeat.
+/// Default number of attempts per request, counting the first.
 const MAX_ATTEMPTS: u32 = 3;
+/// A complete response that held no text block.
+const NO_TEXT: &str = "No text in Claude response";
 /// The longest `retry-after` that is honoured before giving up on Claude.
 const MAX_RETRY_WAIT: Duration = Duration::from_secs(60);
 
@@ -147,6 +149,8 @@ pub struct ClaudeTimings {
     pub stream_idle: Duration,
     /// Upper bound for one attempt, connection to last byte.
     pub request: Duration,
+    /// Attempts per request, counting the first. Only transient failures repeat.
+    pub max_attempts: u32,
 }
 
 impl Default for ClaudeTimings {
@@ -155,6 +159,7 @@ impl Default for ClaudeTimings {
             retry_base: Duration::from_secs(2),
             stream_idle: Duration::from_secs(180),
             request: Duration::from_secs(30 * 60),
+            max_attempts: MAX_ATTEMPTS,
         }
     }
 }
@@ -211,7 +216,7 @@ async fn send_with_retries(
             continue;
         }
 
-        if !failure.kind.is_transient() || attempt >= MAX_ATTEMPTS {
+        if !failure.kind.is_transient() || attempt >= call.timings.max_attempts {
             return Err(failure);
         }
         let wait = failure
@@ -220,7 +225,7 @@ async fn send_with_retries(
         if wait > MAX_RETRY_WAIT {
             return Err(failure);
         }
-        warn!("Claude request failed ({:?}); attempt {} of {} follows in {:?}", failure.kind, attempt + 1, MAX_ATTEMPTS, wait);
+        warn!("Claude request failed ({:?}); attempt {} of {} follows in {:?}", failure.kind, attempt + 1, call.timings.max_attempts, wait);
         match cancellation {
             Some(token) => tokio::select! {
                 _ = token.cancelled() => return Err(ClaudeFailure::cancelled()),
@@ -228,6 +233,50 @@ async fn send_with_retries(
             },
             None => tokio::time::sleep(wait).await,
         }
+    }
+}
+
+/// The result of trying a key with a real, minimal request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeyCheck {
+    pub ok: bool,
+    pub message: String,
+}
+
+/// Sends the smallest useful request with this key and model. A real request,
+/// not a format check: only that shows a revoked key, a billing problem or a
+/// model the account cannot use. It costs a few tokens.
+pub async fn check_key(client: &Client, base_url: &str, api_key: &str, model: &str) -> KeyCheck {
+    let api_key = api_key.trim();
+    if api_key.is_empty() {
+        return KeyCheck { ok: false, message: "Enter an API key first.".into() };
+    }
+    let call = ClaudeCall {
+        base_url,
+        api_key,
+        model,
+        system_prompt: "Reply with the single word OK.",
+        user_prompt: "OK?",
+        max_tokens: 16,
+        timings: ClaudeTimings {
+            // One attempt and a short limit: the user is waiting for the answer.
+            max_attempts: 1,
+            stream_idle: Duration::from_secs(30),
+            request: Duration::from_secs(45),
+            ..ClaudeTimings::default()
+        },
+    };
+    match send_with_retries(client, &call, None).await {
+        Ok(_) => KeyCheck { ok: true, message: format!("The key works with {model}.") },
+        // Sixteen tokens are spent on thinking before any text on current
+        // models. The request was accepted and answered, which is the question.
+        Err(failure)
+            if failure.kind == ClaudeFailureKind::Truncated
+                || (failure.kind == ClaudeFailureKind::Protocol && failure.message == NO_TEXT) =>
+        {
+            KeyCheck { ok: true, message: format!("The key works with {model}.") }
+        }
+        Err(failure) => KeyCheck { ok: false, message: failure.message },
     }
 }
 
@@ -502,7 +551,7 @@ impl StreamState {
         }
         let text = self.text();
         if text.is_empty() {
-            return Err(ClaudeFailure::new(Kind::Protocol, "No text in Claude response"));
+            return Err(ClaudeFailure::new(Kind::Protocol, NO_TEXT));
         }
         Ok(text)
     }
@@ -664,7 +713,7 @@ mod tests {
     }
 
     fn fast() -> ClaudeTimings {
-        ClaudeTimings { retry_base: Duration::from_millis(5), stream_idle: Duration::from_millis(400), request: Duration::from_secs(10) }
+        ClaudeTimings { retry_base: Duration::from_millis(5), stream_idle: Duration::from_millis(400), request: Duration::from_secs(10), max_attempts: MAX_ATTEMPTS }
     }
 
     async fn ask(server: &FakeClaude, model: &str) -> Result<String, ClaudeFailure> {
@@ -839,7 +888,7 @@ mod tests {
                 });
             }
         });
-        let timings = ClaudeTimings { retry_base: Duration::from_millis(1), stream_idle: Duration::from_millis(60), request: Duration::from_secs(10) };
+        let timings = ClaudeTimings { retry_base: Duration::from_millis(1), stream_idle: Duration::from_millis(60), ..fast() };
         let call = ClaudeCall { base_url: &base_url, api_key: "k", model: "claude-opus-5-5", system_prompt: "s", user_prompt: "u", max_tokens: 100, timings };
         let failure = send_message(&client(), &call, None).await.unwrap_err();
         assert_eq!(failure.kind, ClaudeFailureKind::Network);
@@ -887,6 +936,38 @@ mod tests {
         assert_eq!(failure.kind, ClaudeFailureKind::Cancelled);
         assert!(failure.message.contains("cancelled"));
         assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[tokio::test]
+    async fn the_key_check_makes_one_real_request_and_reports_in_plain_words() {
+        let truncated = ok_stream(&[
+            serde_json::json!({ "type": "content_block_start", "index": 0, "content_block": { "type": "thinking", "thinking": "" } }),
+            serde_json::json!({ "type": "message_delta", "delta": { "stop_reason": "max_tokens" } }),
+            serde_json::json!({ "type": "message_stop" }),
+        ]);
+        for accepted in [ok_stream(&summary_events("OK")), truncated] {
+            let server = FakeClaude::start(vec![accepted]).await;
+            let check = check_key(&client(), &server.base_url, "  sk-ant-test  ", "claude-opus-5-5").await;
+            assert_eq!(check, KeyCheck { ok: true, message: "The key works with claude-opus-5-5.".into() });
+            let (head, body) = server.requests().remove(0);
+            assert!(head.contains("x-api-key: sk-ant-test"));
+            assert_eq!(body["max_tokens"], 16);
+        }
+
+        for (reply, expected) in [
+            (error_reply(401, "authentication_error", "invalid x-api-key"), "Claude rejected the API key."),
+            (error_reply(402, "billing_error", "no credit"), "billing problem"),
+            (error_reply(404, "not_found_error", "model: claude-nope"), "does not offer the model"),
+            // An outage is reported after one attempt; the user is waiting.
+            (error_reply(529, "overloaded_error", "busy"), "temporarily unavailable"),
+        ] {
+            let server = FakeClaude::start(vec![reply]).await;
+            let check = check_key(&client(), &server.base_url, "sk-ant-test", "claude-opus-5-5").await;
+            assert!(!check.ok);
+            assert!(check.message.contains(expected), "{}", check.message);
+            assert_eq!(server.requests().len(), 1);
+        }
+        assert!(!check_key(&client(), "http://127.0.0.1:9", "   ", "claude-opus-5-5").await.ok);
     }
 
     #[tokio::test]

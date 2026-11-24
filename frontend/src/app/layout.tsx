@@ -27,6 +27,7 @@ import { OptionalModelDownloadsProvider } from '@/contexts/OptionalModelDownload
 import { DownloadProgressToastProvider } from '@/components/shared/DownloadProgressToast'
 import { UpdateCheckProvider } from '@/components/UpdateCheckProvider'
 import { RecordingPostProcessingProvider } from '@/contexts/RecordingPostProcessingProvider'
+import { ConnectionsWatcher } from '@/components/connections/ConnectionsWatcher'
 import { ImportDialogProvider } from '@/contexts/ImportDialogContext'
 import { isAudioExtension, getAudioFormatsDisplayList } from '@/constants/audioFormats'
 import { loadLabsPreferences } from '@/lib/labs'
@@ -527,6 +528,7 @@ export default function RootLayout({
                               <ImportDialogProvider onOpen={handleOpenImportDialog}>
                                 {onboardingCompleted && !showOnboarding && <GlobalSearchDialog />}
                                 {onboardingCompleted && !showOnboarding && <RouteWarmup />}
+                                {onboardingCompleted && !showOnboarding && <ConnectionsWatcher />}
                                 {/* Download progress toast provider - listens for background downloads */}
                                 <DownloadProgressToastProvider />
 
