@@ -17,6 +17,7 @@ import {
   type GoogleCheck,
   type GoogleStatus,
 } from '@/lib/connections';
+import { DriveExportOptions } from './DriveExportOptions';
 import { GoogleSetupGuide } from './GoogleSetupGuide';
 
 function stateBadge(status: GoogleStatus) {
@@ -105,6 +106,8 @@ export function GoogleCard({ openGuideInitially = false }: { openGuideInitially?
           />
         </ul>
       )}
+
+      {status.connected && status.driveGranted && <DriveExportOptions />}
 
       {check && (
         <ul className="mt-3 space-y-1 text-[13px]" aria-label="Test results">

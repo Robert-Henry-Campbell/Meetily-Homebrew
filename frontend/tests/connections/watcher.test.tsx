@@ -1,6 +1,6 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, test } from 'bun:test';
-import { CONNECTED, flush, nativeListeners, pushed, reset, text, toasts } from './harness';
+import { CONNECTED, flush, named, nativeListeners, pushed, reset, text, toasts } from './harness';
 
 const { ConnectionsWatcher } = await import('../../src/components/connections/ConnectionsWatcher');
 const { ConnectionsBanner } = await import('../../src/components/connections/ConnectionsBanner');
@@ -8,7 +8,7 @@ let root: ReactTestRenderer;
 const ENDED = 'Google ended this sign-in (it expired or access was removed). Sign in again.';
 const emit = (payload: unknown) => act(async () => nativeListeners.get('google-connection-changed')!({ payload }));
 
-beforeEach(() => reset({ google_connection_status: () => CONNECTED }));
+beforeEach(() => reset({ google_connection_status: () => CONNECTED, set_user_display_name: () => undefined }));
 afterEach(async () => { await act(async () => root?.unmount()); });
 
 test('a connection that stops working is announced once, with a button that opens Connections', async () => {
@@ -31,7 +31,7 @@ test('a connection that stops working is announced once, with a button that open
 });
 
 test('a problem that already exists at launch is announced, and a Drive permission left unticked counts as one', async () => {
-  reset({ google_connection_status: () => ({ ...CONNECTED, driveGranted: false }) });
+  reset({ google_connection_status: () => ({ ...CONNECTED, driveGranted: false }), set_user_display_name: () => undefined });
   await act(async () => { root = create(<ConnectionsWatcher />); });
   await flush();
   expect(toasts).toHaveLength(1);
@@ -47,4 +47,11 @@ test('the home page shows a line while a connection needs attention and nothing 
   expect(shown).toContain(ENDED);
   expect(shown).toContain('Meetings wait and are sent once this is fixed.');
   expect(root.root.findByType('a').props.href).toBe('/settings?section=connections');
+});
+
+test('the display name is copied to the native side at launch, for files written in the background', async () => {
+  Object.assign(globalThis, { window: {}, localStorage: { getItem: (key: string) => (key === 'meetily_user_name' ? '  Rob  ' : null) } });
+  await act(async () => { root = create(<ConnectionsWatcher />); });
+  await flush();
+  expect(named('set_user_display_name').map(([, args]) => args)).toEqual([{ name: 'Rob' }]);
 });

@@ -38,6 +38,7 @@ pub mod llm_client;
 pub(crate) mod metadata;
 pub mod processor;
 pub mod service;
+pub mod stored_markdown;
 pub mod summary_engine;
 pub mod template_commands;
 pub mod templates;

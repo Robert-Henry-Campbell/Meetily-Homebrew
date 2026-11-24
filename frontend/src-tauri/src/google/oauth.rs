@@ -530,6 +530,14 @@ pub async fn access_token(pool: &SqlitePool, http: &reqwest::Client, endpoints: 
     }
 }
 
+/// Makes the next `access_token()` call refresh. An API client calls this when
+/// Google answers 401 to a token that still looked valid.
+pub async fn expire_access_token(pool: &SqlitePool) {
+    if let Err(error) = config_store::set(pool, KEY_ACCESS_EXPIRES_AT, "0").await {
+        log::warn!("Could not mark the Google access token as expired: {error}");
+    }
+}
+
 /// Records that the user has to act. Used by the refresh above and by API
 /// clients that receive 401 with a token that was just refreshed.
 pub async fn mark_needs_attention(pool: &SqlitePool, reason: &str) {

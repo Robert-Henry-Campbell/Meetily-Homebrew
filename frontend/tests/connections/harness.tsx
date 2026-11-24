@@ -35,6 +35,17 @@ mock.module('@/components/ui/dialog', () => ({
   DialogTitle: ({ children }: any) => <h2>{children}</h2>,
   DialogDescription: ({ children }: any) => <p>{children}</p>,
 }));
+// Always open: the tests look at what a popover offers, not at its motion.
+mock.module('@/components/ui/popover', () => ({
+  Popover: ({ children }: any) => <div>{children}</div>,
+  PopoverTrigger: ({ children }: any) => children,
+  PopoverContent: ({ children }: any) => <div role="region">{children}</div>,
+}));
+mock.module('@/components/ui/switch', () => ({
+  Switch: ({ checked, onCheckedChange, className, ...props }: any) => (
+    <button role="switch" aria-checked={checked} onClick={() => onCheckedChange(!checked)} {...props} />
+  ),
+}));
 mock.module('@/components/ui/confirm-dialog', () => ({
   ConfirmDialog: ({ open, title, description, confirmLabel, onConfirm, onOpenChange }: any) => (open ? (
     <div role="alertdialog" data-title={title}>

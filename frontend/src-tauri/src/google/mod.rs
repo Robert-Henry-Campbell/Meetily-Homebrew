@@ -7,4 +7,5 @@
 
 pub mod commands;
 pub mod config;
+pub mod drive;
 pub mod oauth;

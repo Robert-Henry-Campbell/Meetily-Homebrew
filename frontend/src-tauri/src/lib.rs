@@ -44,6 +44,7 @@ pub mod crash_report;
 pub mod diagnostics;
 pub mod database;
 pub mod diarization;
+pub mod export;
 mod optional_models;
 pub mod notifications;
 pub mod ollama;
@@ -595,6 +596,10 @@ pub fn run() {
             })
             .expect("Failed to initialize database");
 
+            // The Drive export reads its queue from the database, so it starts
+            // once the database is ready and runs for the life of the app.
+            export::worker::spawn(_app.handle().clone());
+
             // Initialize bundled templates directory for dynamic template discovery
             log::info!("Initializing bundled templates directory...");
             if let Ok(resource_path) = _app.handle().path().resource_dir() {
@@ -820,6 +825,11 @@ pub fn run() {
             google::commands::google_cancel_sign_in,
             google::commands::google_disconnect,
             google::commands::google_test_connection,
+            export::commands::drive_export_status,
+            export::commands::drive_export_send_now,
+            export::commands::drive_export_settings,
+            export::commands::drive_export_save_settings,
+            export::commands::set_user_display_name,
             summary::claude_commands::claude_status,
             summary::claude_commands::claude_models,
             summary::claude_commands::claude_check_key,

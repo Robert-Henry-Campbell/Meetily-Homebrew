@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { syncUserDisplayName } from '@/lib/drive-export';
 
 const KEY = 'meetily_user_name';
 const EVENT = 'af-user-name';
@@ -21,6 +22,8 @@ export function saveUserName(name: string) {
     // Storage unavailable; the name simply is not remembered.
   }
   window.dispatchEvent(new CustomEvent(EVENT));
+  // Files written in the background (the Drive export) show the same name.
+  void syncUserDisplayName(name.trim());
 }
 
 /** The user's display name (Settings → General), kept live across screens. */

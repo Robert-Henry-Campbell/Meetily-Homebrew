@@ -7,7 +7,8 @@ let root: ReactTestRenderer;
 const mount = async () => { await act(async () => { root = create(<GoogleCard />); }); await flush(); };
 const field = (label: string) => root.root.findByProps({ 'aria-label': label });
 
-beforeEach(() => reset({ google_connection_status: () => NOT_CONNECTED, open_external_url: () => undefined }));
+const DRIVE_OPTIONS = { autoExport: true, folderPerPerson: true, rootFolderName: 'Meetily meetings', enabledSince: 1 };
+beforeEach(() => reset({ google_connection_status: () => NOT_CONNECTED, open_external_url: () => undefined, drive_export_settings: () => DRIVE_OPTIONS }));
 afterEach(async () => { await act(async () => root?.unmount()); });
 
 test('an unconnected card offers the guide, whose buttons open the Google Cloud pages for each step', async () => {
@@ -84,6 +85,7 @@ test('signing in waits for the browser, then tests both services and shows each 
     google_connection_status: () => CLIENT_ONLY,
     google_sign_in: () => new Promise((resolve) => { finish = resolve; }),
     google_cancel_sign_in: () => undefined,
+    drive_export_settings: () => DRIVE_OPTIONS,
     google_test_connection: () => ({
       drive: { ok: true, message: 'Drive works.' },
       calendar: { ok: false, message: 'This API is not enabled in your Google Cloud project (step 1).' },
@@ -128,6 +130,7 @@ test('a sign-in that was declined shows why and can be cancelled while it waits'
 test('a connected card shows the account and permissions, can be tested, and disconnects after confirmation', async () => {
   reset({
     google_connection_status: () => ({ ...CONNECTED, calendarGranted: false }),
+    drive_export_settings: () => DRIVE_OPTIONS,
     google_test_connection: () => ({ drive: { ok: true, message: 'Drive works.' }, calendar: { ok: false, message: 'The Calendar permission was not ticked.' } }),
     google_disconnect: () => CLIENT_ONLY,
   });
@@ -137,6 +140,8 @@ test('a connected card shows the account and permissions, can be tested, and dis
   expect(shown).toContain('Connected');
   expect(shown).toContain('Allowed');
   expect(shown).toContain('Not allowed');
+  // The export options appear once Drive may be used.
+  expect(shown).toContain('Send meetings to Drive automatically');
 
   await click(root, 'Test the connection');
   expect(text(root)).toContain('Drive works.');
@@ -151,7 +156,10 @@ test('a connected card shows the account and permissions, can be tested, and dis
 });
 
 test('a sign-in that Google ended is shown as needing attention, with one button to fix it', async () => {
-  reset({ google_connection_status: () => ({ ...CONNECTED, needsAttention: 'Google ended this sign-in (it expired or access was removed). Sign in again.' }) });
+  reset({
+    google_connection_status: () => ({ ...CONNECTED, needsAttention: 'Google ended this sign-in (it expired or access was removed). Sign in again.' }),
+    drive_export_settings: () => DRIVE_OPTIONS,
+  });
   await mount();
   expect(text(root)).toContain('Needs attention');
   expect(text(root)).toContain('Google ended this sign-in');

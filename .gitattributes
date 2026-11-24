@@ -12,3 +12,4 @@ frontend/src-tauri/migrations/20260928000000_unified_workspace.sql text eol=lf
 frontend/src-tauri/migrations/20260928010000_reset_placeholder_titles.sql text eol=lf
 frontend/src-tauri/migrations/20261123000000_add_post_call_jobs.sql text eol=lf
 frontend/src-tauri/migrations/20261124000000_add_integration_config.sql text eol=lf
+frontend/src-tauri/migrations/20261124010000_add_drive_export.sql text eol=lf

@@ -104,6 +104,8 @@ pub async fn google_sign_in<R: Runtime>(
     match result {
         Ok(status) => {
             announce(&app, &status);
+            // Meetings that waited for the connection are sent now.
+            crate::export::worker::wake();
             Ok(status)
         }
         Err(error) => Err(error.to_string()),

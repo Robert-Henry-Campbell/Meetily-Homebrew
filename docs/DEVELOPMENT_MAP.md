@@ -208,6 +208,11 @@ Read [HOMEBREW_CONNECTIONS.md](HOMEBREW_CONNECTIONS.md) before changing
 `src-tauri/src/google/`, `src-tauri/src/integrations/`, or
 `summary/claude_commands.rs`.
 
+Finished meetings are sent to Google Drive as Markdown by a native background
+worker whose queue is the table `drive_export_state`, fed by SQLite triggers.
+Read [HOMEBREW_DRIVE_EXPORT.md](HOMEBREW_DRIVE_EXPORT.md) before changing
+`src-tauri/src/export/`, `google/drive.rs`, or a table those triggers watch.
+
 ## 4. Optional download ownership and UI synchronization
 
 ### October integration interfaces

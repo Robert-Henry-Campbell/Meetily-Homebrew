@@ -42,6 +42,7 @@ import { RetranscribeDialog } from '@/components/MeetingDetails/RetranscribeDial
 import { useConfig } from '@/contexts/ConfigContext';
 import { formatDuration, parseDate } from '@/lib/dates';
 import { timeRange } from '@/lib/meeting-titles';
+import { DriveChip } from '@/components/meeting/DriveChip';
 import { useUserName } from '@/hooks/useUserName';
 import { isUserSpeaker, speakerKey } from '@/utils/speakerUtils';
 import { useDiarizationEngine } from '@/hooks/useDiarizationEngine';
@@ -152,6 +153,7 @@ export function MeetingHeader({
             {when && <span className="tabular-nums">{when}</span>}
             {durationSeconds ? <span className="tabular-nums">{formatDuration(durationSeconds)}</span> : null}
             <GroupPicker value={groupId} onChange={onGroupChange} placeholder="Add to group" />
+            <DriveChip meetingId={meetingId} />
           </div>
           {uniquePeople.length > 0 && (
             <ul aria-label="People in this meeting" className="-ml-1 mt-2 flex flex-wrap items-center gap-0.5">
