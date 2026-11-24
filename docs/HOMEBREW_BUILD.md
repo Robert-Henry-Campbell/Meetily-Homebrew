@@ -53,15 +53,24 @@ It follows the base's `build-labs-test-windows.ps1` and the Vulkan part of
 `build-universal-windows.ps1`, without the CPU and CUDA variants, the
 bootstrapper, code signing and updater artifacts.
 
-`.github/workflows/homebrew-windows.yml` runs it on `windows-2022`. It is
-started by hand:
+`.github/workflows/homebrew-windows.yml` runs it on `windows-2022`:
 
-1. GitHub, the fork, tab Actions. If workflows are disabled, enable them.
-2. Choose "Homebrew: Windows installer (Vulkan)", "Run workflow", branch
-   `homebrew`.
-3. When the run has finished (about 40 to 70 minutes the first time), download
-   the artifact `meetily-homebrew-windows-x64-vulkan`. It contains the
-   installer and `SHA256SUMS.txt`.
+1. GitHub, the fork, tab Actions. If workflows are disabled, enable them
+   ("I understand my workflows, go ahead and enable them").
+2. Start the build by creating the branch `build/homebrew-installer` from
+   `homebrew` (Code tab, branch menu, type the name, "Create branch
+   build/homebrew-installer from homebrew"). A push to that branch starts the
+   workflow. For a later build, delete the branch and create it again, or
+   push the newer `homebrew` commit to it.
+3. When the run has finished (about 40 to 70 minutes the first time), open it
+   in the Actions tab and download the artifact
+   `meetily-homebrew-windows-x64-vulkan`. It contains the installer and
+   `SHA256SUMS.txt`.
+
+GitHub shows the "Run workflow" button only for workflows on the default
+branch. `main` is the default branch and stays identical to the base, so the
+button is absent unless `homebrew` is made the default branch in the
+repository settings.
 
 The base's own `build-windows.yml` is not used: it is inherited from upstream,
 pins pnpm 8 against a lockfile it cannot read, and compiles the app before the

@@ -1,10 +1,20 @@
 name: "Homebrew: Windows installer (Vulkan)"
 
-# The unsigned Windows installer of this personal build. Started by hand from
-# the Actions tab, on the `homebrew` branch. Nothing is published: the
-# installer is an artifact of the run.
+# The unsigned Windows installer of this personal build. Nothing is published:
+# the installer is an artifact of the run.
+#
+# Two ways to start it:
+# - Push to the branch `build/homebrew-installer` (for example, create that
+#   branch from `homebrew` in the GitHub web interface). This works while
+#   `main`, the default branch, stays identical to the base project.
+# - "Run workflow" in the Actions tab. GitHub offers that button only for
+#   workflows on the default branch, so it appears once `homebrew` is made the
+#   default branch.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - build/homebrew-installer
 
 permissions:
   contents: read
