@@ -97,7 +97,10 @@ After the installer is uploaded, the workflow runs
    `%LOCALAPPDATA%\Meetily-ActuallyFree` folder appeared.
 3. The app is started and has to create `data\meeting_minutes.sqlite` within
    90 seconds. The window does that on a first start, so it shows that the
-   embedded frontend loaded in WebView2 and every migration applied.
+   embedded frontend loaded in WebView2 and every migration applied. The
+   program loads `vulkan-1.dll` at start; the build machine has no graphics
+   driver, so the test fetches the loader from LunarG's runtime components.
+   If no loader can be had, the start check is skipped with a warning.
 4. Silent uninstall.
 
 A failed smoke test turns the run red and leaves the installer downloadable.
@@ -105,10 +108,10 @@ The script refuses to run on a machine where this app or a stock Meetily is
 installed.
 
 The build log also lists the DLLs the program loads at start
-("DLL imports of the app"). `vulkan-1.dll` in that list means the app starts
+("DLL imports of the app"). `vulkan-1.dll` is in that list: the app starts
 only on a PC whose graphics driver provides the Vulkan loader; current AMD
-and Intel drivers do. The build machine has no graphics driver, so the smoke
-test borrows the loader from the Vulkan SDK.
+and Intel drivers do. On a PC without it, Windows reports that
+`vulkan-1.dll` was not found when the app is started.
 
 ### LLVM 18
 
@@ -155,6 +158,7 @@ from an address that answers "Not Found". Tauri's bundler fetches its own NSIS.
 | 2026-11-24, first run | Cancelled by the three-hour limit in the LLVM download described above. All earlier steps passed. |
 | 2026-11-24, second run | LLVM 18 installed in 19 seconds; the Next.js build and the summary helper compiled. The app build stopped in the build script of `ort-sys` (ONNX Runtime bindings). The build machine had Rust 1.100, whose cargo keeps build folders as `build\<package>\<hash>` instead of `build\<package>-<hash>`; `ort-sys` derives the folder for its DLL copies from that position and found none. |
 | 2026-11-24, third run | With Rust 1.97.0 and `ORT_LIB_LOCATION` the app compiled for Windows (16 minutes) and its imports were listed; `vulkan-1.dll` is among them. The run stopped in the base's NSIS progress plugin script, at its NSIS download. |
+| 2026-11-24, fourth run | The installer was built and uploaded (16 minutes with the cache). Smoke test: the silent install passed, the files were in `%LOCALAPPDATA%\Meetily-Homebrew`, and no stock folder appeared. The start check failed with "DLL not found" (exit code -1073741515): the build machine has no Vulkan loader and the Vulkan SDK step provides none. |
 
 The installer is unsigned. Windows SmartScreen shows "Windows protected your
 PC"; choose "More info", then "Run anyway". The first start downloads about
