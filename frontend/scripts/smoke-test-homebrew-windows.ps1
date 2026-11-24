@@ -136,25 +136,42 @@ if (-not $loader) {
   $exited = $app.HasExited
   $exitCode = if ($exited) { $app.ExitCode } else { $null }
   $hasDatabase = Test-Path -LiteralPath $database
-  if (-not $exited) { Start-Sleep -Seconds 5 }  # lets first-run setup finish its writes
+
+  # The file appears before the migrations have run. The app reports the end
+  # of its first-run database setup in its log (database\commands.rs), which
+  # goes to the redirected error stream.
+  $setupReported = 'Fresh database initialized successfully'
+  $setupDeadline = (Get-Date).AddSeconds(30)
+  while (-not $exited -and (Get-Date) -lt $setupDeadline) {
+    $reported = $false
+    try { $reported = [bool](Select-String -LiteralPath $stderr -Pattern $setupReported -SimpleMatch -Quiet) } catch { $reported = $false }
+    if ($reported) { break }
+    Start-Sleep -Seconds 2
+  }
 
   Get-Process -Name 'meetily-homebrew' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
   Start-Sleep -Seconds 2
 
-  foreach ($log in @(@('app output', $stdout), @('app errors', $stderr))) {
-    if ((Test-Path -LiteralPath $log[1]) -and (Get-Item -LiteralPath $log[1]).Length -gt 0) {
-      Write-Host "--- $($log[0]) (first 80 lines) ---"
-      Get-Content -LiteralPath $log[1] -TotalCount 80 | ForEach-Object { Write-Host $_ }
-    }
+  $logLines = @()
+  foreach ($path in @($stdout, $stderr)) {
+    if (Test-Path -LiteralPath $path) { $logLines += @(Get-Content -LiteralPath $path) }
   }
+  Write-Host "--- app log: $($logLines.Count) lines; first 30 and last 30 ---"
+  $logLines | Select-Object -First 30 | ForEach-Object { Write-Host $_ }
+  if ($logLines.Count -gt 60) { Write-Host '  ...' }
+  if ($logLines.Count -gt 30) { $logLines | Select-Object -Last ([Math]::Min(30, $logLines.Count - 30)) | ForEach-Object { Write-Host $_ } }
+  $setupDone = [bool]($logLines | Where-Object { $_ -like "*$setupReported*" } | Select-Object -First 1)
+  $panicked = $logLines | Where-Object { $_ -like '*panicked at*' } | Select-Object -First 1
   $dataFolder = Join-Path $installDir 'data'
   if (Test-Path -LiteralPath $dataFolder) {
     Write-Host "Data folder: $((Get-ChildItem -LiteralPath $dataFolder | ForEach-Object { $_.Name }) -join ', ')"
   }
 
   if ($exited) { throw "The app ended by itself after $seconds seconds (exit code $exitCode)" }
+  if ($panicked) { throw "The app reported an internal error: $panicked" }
   if (-not $hasDatabase) { throw "The app ran for $seconds seconds without creating its database: the window did not load, or first-run setup did not start" }
-  Write-Host "The app started and created its database after about $seconds seconds: $database"
+  if (-not $setupDone) { throw 'The database file exists, but the app did not report a finished first-run database setup, which includes the migrations' }
+  Write-Host "The app started, created its database after about $seconds seconds and finished first-run database setup: $database"
 }
 
 # --- Uninstall (informational) ---------------------------------------------------

@@ -96,8 +96,10 @@ After the installer is uploaded, the workflow runs
    registered for removal as "Meetily Homebrew", and no
    `%LOCALAPPDATA%\Meetily-ActuallyFree` folder appeared.
 3. The app is started and has to create `data\meeting_minutes.sqlite` within
-   90 seconds. The window does that on a first start, so it shows that the
-   embedded frontend loaded in WebView2 and every migration applied. The
+   90 seconds and report "Fresh database initialized successfully" in its
+   log. The window starts that on a first start and the app logs the line
+   after the migrations, so it shows that the embedded frontend loaded in
+   WebView2 and every migration applied. The
    program loads `vulkan-1.dll` at start; the build machine has no graphics
    driver, so the test fetches the loader from LunarG's runtime components.
    If no loader can be had, the start check is skipped with a warning.
@@ -159,6 +161,7 @@ from an address that answers "Not Found". Tauri's bundler fetches its own NSIS.
 | 2026-11-24, second run | LLVM 18 installed in 19 seconds; the Next.js build and the summary helper compiled. The app build stopped in the build script of `ort-sys` (ONNX Runtime bindings). The build machine had Rust 1.100, whose cargo keeps build folders as `build\<package>\<hash>` instead of `build\<package>-<hash>`; `ort-sys` derives the folder for its DLL copies from that position and found none. |
 | 2026-11-24, third run | With Rust 1.97.0 and `ORT_LIB_LOCATION` the app compiled for Windows (16 minutes) and its imports were listed; `vulkan-1.dll` is among them. The run stopped in the base's NSIS progress plugin script, at its NSIS download. |
 | 2026-11-24, fourth run | The installer was built and uploaded (16 minutes with the cache). Smoke test: the silent install passed, the files were in `%LOCALAPPDATA%\Meetily-Homebrew`, and no stock folder appeared. The start check failed with "DLL not found" (exit code -1073741515): the build machine has no Vulkan loader and the Vulkan SDK step provides none. |
+| 2026-11-24, fifth run | Green. With the loader from LunarG's runtime components (signature valid) the installed app started on the build machine, loaded ONNX Runtime 1.22.0 and created its database after about 10 seconds. The silent uninstall left only `data` and `uninstall.exe`. |
 
 The installer is unsigned. Windows SmartScreen shows "Windows protected your
 PC"; choose "More info", then "Run anyway". The first start downloads about
