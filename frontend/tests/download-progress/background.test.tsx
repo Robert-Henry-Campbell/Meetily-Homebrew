@@ -21,7 +21,7 @@ mock.module('@tauri-apps/api/event', () => ({
 mock.module('@tauri-apps/api/core', () => ({
   invoke: async (command: string) => {
     calls.push(command);
-    if (command === 'whisper_get_available_models') return [{ name: 'large-v3-turbo-q5_0', status: whisperStatus }];
+    if (command === 'whisper_get_available_models') return [{ name: 'large-v3', status: whisperStatus }];
     if (command === 'diarization_get_status') return { nemotron_available: false, active_engine: 'pyannote' };
     if (command === 'api_get_post_call_transcript_config') return { provider: 'live', model: '' };
     if (['whisper_download_model', 'download_diarization_models', 'api_save_post_call_transcript_config'].includes(command)) {
@@ -65,7 +65,7 @@ afterEach(async () => { await act(async () => root?.unmount()); listeners.clear(
 test('optional jobs started before the panel mounts share the main model stack across navigation', async () => {
   await act(async () => { root = create(<App page="setup" panel={false} />); });
   await act(async () => { current.startDownload('whisper'); current.startDownload('nemotron'); });
-  await emit('model-download-progress', { modelName: 'large-v3-turbo-q5_0', progress: 36 });
+  await emit('model-download-progress', { modelName: 'large-v3', progress: 36 });
   await emit('diarization-download-progress', { file: 'nemotron3_diar_v3.onnx', percent: 47, status: 'downloading' });
   await act(async () => root.update(<App page="home" />));
   expect(bar('Whisper')!.props['aria-valuenow']).toBe(36);
@@ -90,7 +90,7 @@ test('verification and activation stay visible until the owning jobs actually fi
   await emit('diarization-download-progress', { file: '', percent: 100, status: 'done', message: 'Nemotron-3 Diarization model installed successfully' });
   expect(bar('Nemotron')!.props['aria-valuetext']).toContain('Enabling model');
   expect(current.jobs.nemotron.enabled).not.toBe(true);
-  await emit('model-download-activating', { modelName: 'large-v3-turbo-q5_0' });
+  await emit('model-download-activating', { modelName: 'large-v3' });
   expect(bar('Whisper')!.props['aria-valuetext']).toContain('Enabling model');
   await act(async () => pending.get('whisper_download_model')!.resolve());
   expect(bar('Whisper')).toBeDefined();
@@ -126,7 +126,7 @@ test('restored native Whisper progress appears after leaving the dedicated setup
   await act(async () => root.update(<App page="next-setup-step" />));
   expect(bar('Whisper')!.props['aria-valuenow']).toBe(62);
   expect(calls).not.toContain('whisper_download_model');
-  await emit('model-download-complete', { modelName: 'large-v3-turbo-q5_0' });
+  await emit('model-download-complete', { modelName: 'large-v3' });
   expect(bars()).toHaveLength(0);
   expect(calls).not.toContain('api_save_post_call_transcript_config');
 });

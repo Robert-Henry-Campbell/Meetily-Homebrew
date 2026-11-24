@@ -19,7 +19,7 @@ mock.module('sonner', () => ({ toast: { success: () => {}, error: () => {} } }))
 mock.module('@tauri-apps/api/event', () => ({ listen: async () => () => {} }));
 mock.module('@tauri-apps/api/core', () => ({ invoke: async (command: string) => {
   if (command === 'diarization_get_status') return { active_engine: activeEngine, nemotron_available: nativeNemotronAvailable, pyannote_available: true, model_dir: 'fixture-models', nemotron_threshold: 0.5 };
-  if (command === 'whisper_get_available_models') return [{ name: 'large-v3-turbo-q5_0', status: nativeWhisperAvailable ? 'Available' : 'Missing' }];
+  if (command === 'whisper_get_available_models') return [{ name: 'large-v3', status: nativeWhisperAvailable ? 'Available' : 'Missing' }];
   if (command === 'parakeet_get_available_models') return [{ name: 'parakeet-tdt-0.6b-v3-int8', status: 'Available' }];
   if (command === 'api_get_post_call_transcript_config') return postCall;
   if (command === 'api_get_vocabulary') return { global: '', meeting: '' };
@@ -58,7 +58,7 @@ test('Settings shows both background downloads before they are selected and refr
   expect(JSON.stringify(root.toJSON())).toContain('Current file: ');
   expect(JSON.stringify(root.toJSON())).not.toContain('Install Whisper model');
   nativeWhisperAvailable = true; nativeNemotronAvailable = true; activeEngine = 'nemotron';
-  postCall = { provider: 'whisper', model: 'large-v3-turbo-q5_0' };
+  postCall = { provider: 'whisper', model: 'large-v3' };
   jobs.whisper = { status: 'ready', progress: 100, enabled: true };
   jobs.nemotron = { status: 'ready', progress: 100, enabled: true };
   await act(async () => {

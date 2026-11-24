@@ -7,7 +7,7 @@ const events = new Map<string, (event: any) => void>();
 const keys = new Set<(event: any) => void>();
 const calls: Array<[string, any]> = [];
 Object.assign(globalThis, { React,
-  sessionStorage: { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value) },
+  sessionStorage: { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) },
   window: { addEventListener: (_: string, fn: any) => keys.add(fn), removeEventListener: (_: string, fn: any) => keys.delete(fn) },
 });
 mock.module('@tauri-apps/api/event', () => ({ listen: async (name: string, fn: any) => {
@@ -23,7 +23,7 @@ mock.module('@/hooks/useDiarizationEngine', () => ({ useDiarizationEngine: () =>
 mock.module('@/contexts/ConfigContext', () => ({ useConfig: () => ({ selectedLanguage: null, transcriptModelConfig: {} }) }));
 mock.module('@/lib/parakeet', () => ({ isVisibleParakeetModel: () => true }));
 mock.module('@/lib/workspace-api', () => ({ announceChange: () => {} }));
-mock.module('sonner', () => ({ toast: { success() {}, error() {}, info() {} } }));
+mock.module('sonner', () => ({ toast: { success() {}, error() {}, info() {}, warning() {} } }));
 mock.module('@/components/PostCallHandoffCard', () => ({ PostCallHandoffCard: ({ children, detail, onDismiss }: any) => <section onKeyDown={(event: any) => { if (event.key === 'Escape') onDismiss?.(); }}>{detail}{children}</section> }));
 mock.module('@/components/ui/button', () => ({ Button: (props: any) => <button {...props} /> }));
 const { PostCallJobsProvider } = await import('../src/contexts/PostCallJobsContext');
@@ -40,6 +40,8 @@ function App({ page = 'a', enabled = true }: { page?: string; enabled?: boolean 
     onComplete={page === 'a' ? completeA : completeB} />}</PostCallJobsProvider>;
 }
 const button = (label: string) => root.root.findAllByType('button').find(node => node.children.includes(label))!;
+// Stored progress and the participant list are bookkeeping, not processing work.
+const work = () => calls.filter(([name]) => ['start_retranscription_command', 'diarize_meeting', 'cancel_retranscription_command'].includes(name));
 beforeEach(() => { storage.clear(); calls.length = 0; refreshA.mockClear(); refreshB.mockClear(); completeA.mockClear(); completeB.mockClear(); });
 afterEach(async () => { await act(async () => root?.unmount()); events.clear(); });
 
@@ -62,14 +64,17 @@ test('navigation retains work; completion refreshes only its meeting on return',
 test('keep-live dismisses without enhancement or diarization', async () => {
   await act(async () => { root = create(<App />); });
   await act(async () => button('Keep live transcript').props.onClick());
-  expect(calls).toHaveLength(0);
+  expect(work()).toHaveLength(0);
   expect(completeA).toHaveBeenCalledTimes(1);
+  // The choice is stored, so the Drive export and a restart both know the live rows were kept.
+  expect(calls.find(([name, args]) => name === 'post_call_job_save' && args.update.stage === 'summary')?.[1].update)
+    .toMatchObject({ meetingId: 'a', usedLiveTranscript: true });
 });
 
 test('Escape dismisses the prompt without starting work', async () => {
   await act(async () => { root = create(<App />); });
   await act(async () => root.root.findByType('section').props.onKeyDown({ key: 'Escape' }));
-  expect(calls).toHaveLength(0);
+  expect(work()).toHaveLength(0);
   expect(completeA).toHaveBeenCalledTimes(1);
 });
 

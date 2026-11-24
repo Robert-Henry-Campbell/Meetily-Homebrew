@@ -13,3 +13,6 @@ export async function activateOptionalModel(model: 'whisper' | 'nemotron', whisp
     window.dispatchEvent(new Event(OPTIONAL_MODEL_PREFERENCES_CHANGED));
   }
 }
+
+/** Must match `optional_models::WHISPER_MODEL`: native activation accepts only that model. */
+export const OPTIONAL_WHISPER_MODEL = 'large-v3';

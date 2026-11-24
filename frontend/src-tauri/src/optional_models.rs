@@ -3,7 +3,10 @@ use sqlx::SqlitePool;
 use std::path::Path;
 use tauri::{Emitter, Manager};
 
-pub const WHISPER_MODEL: &str = "large-v3-turbo-q5_0";
+/// The post-call model setup offers and native activation enables. This build
+/// uses the largest catalog model: the second pass replaces the live transcript,
+/// so accuracy matters more than speed there.
+pub const WHISPER_MODEL: &str = "large-v3";
 static WHISPER_OPERATION: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 static WHISPER_ACTIVATION: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 static NEMOTRON_OPERATION: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());

@@ -23,7 +23,8 @@ import {
 export function SetupOverviewStep() {
   const { goNext } = useOnboarding();
   const { jobs, startDownload } = useOptionalModelDownloads();
-  const [installWhisper, setInstallWhisper] = useState(false);
+  // On by default: the automatic chain after Stop re-transcribes with this model.
+  const [installWhisper, setInstallWhisper] = useState(true);
   const [installNemotron, setInstallNemotron] = useState(false);
   const [isMac, setIsMac] = useState(false);
   const [whisperBackend, setWhisperBackend] = useState<WhisperBackend | null | undefined>();
@@ -233,8 +234,8 @@ export function SetupOverviewStep() {
           <h3 className="text-sm font-medium">Optional upgrades</h3>
           <label className="flex cursor-pointer items-start gap-3 text-sm">
             <Checkbox checked={installWhisper} onCheckedChange={checked => setInstallWhisper(checked === true)} className="mt-0.5" />
-            <span>Whisper for retranscription <span className="rounded-full bg-af-accent/10 px-1.5 py-0.5 text-[11px] font-medium text-af-accent">Recommended</span> <span className="text-af-text-3">{jobs.whisper.status === 'ready' ? '· Installed; enable it' : '· ~547 MB'}</span>
-              <span className="mt-0.5 block text-xs leading-5 text-af-text-2">Large v3 Turbo Q5 for post-call enhancement and retranscribing recordings. Parakeet remains the live transcription engine.</span>
+            <span>Whisper for retranscription <span className="rounded-full bg-af-accent/10 px-1.5 py-0.5 text-[11px] font-medium text-af-accent">Recommended</span> <span className="text-af-text-3">{jobs.whisper.status === 'ready' ? '· Installed; enable it' : '· ~3 GB'}</span>
+              <span className="mt-0.5 block text-xs leading-5 text-af-text-2">Large v3, the most accurate model, re-transcribes each recording after you stop. Parakeet remains the live transcription engine. On slower graphics this pass can take as long as the meeting.</span>
             </span>
           </label>
           <label className="flex cursor-pointer items-start gap-3 text-sm">

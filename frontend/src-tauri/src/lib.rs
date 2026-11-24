@@ -62,6 +62,7 @@ pub mod meeting_detection;
 pub mod minibar;
 pub mod parakeet_engine;
 pub mod paths;
+pub mod post_call;
 pub mod state;
 pub mod summary;
 pub mod tray;
@@ -804,6 +805,12 @@ pub fn run() {
             database::repositories::action_item::api_list_unsynced_action_meetings,
             database::repositories::meeting_notes::api_get_meeting_notes,
             database::repositories::meeting_notes::api_save_meeting_notes,
+            post_call::post_call_job_save,
+            post_call::post_call_job_get,
+            post_call::post_call_jobs_unfinished,
+            post_call::meeting_participants_set,
+            post_call::meeting_participants_get,
+            post_call::meeting_speaker_labels,
             api::api_get_meeting_audio,
             meeting_detection::get_meeting_detection_settings,
             meeting_detection::set_meeting_detection_settings,

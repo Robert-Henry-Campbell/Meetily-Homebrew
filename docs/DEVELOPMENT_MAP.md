@@ -196,6 +196,12 @@ state for dialogs, including native activation events and stale-response guards.
 Live ASR and post-call ASR defaults are independent. Optional Whisper activation
 saves the **post-call** default; it must not replace the live Parakeet selection.
 
+In this fork the chain after Stop is unattended after the speaker question:
+steps retry once and then continue, progress is stored in `post_call_jobs`,
+unfinished jobs resume at launch, and the job owner starts the summary instead
+of the meeting page. Read [HOMEBREW_AUTO_CHAIN.md](HOMEBREW_AUTO_CHAIN.md)
+before changing the worker, the job owner, or `src-tauri/src/post_call.rs`.
+
 ## 4. Optional download ownership and UI synchronization
 
 ### October integration interfaces

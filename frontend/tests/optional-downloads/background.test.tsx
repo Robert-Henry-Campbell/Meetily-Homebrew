@@ -16,7 +16,7 @@ mock.module('@tauri-apps/api/event', () => ({ listen: async (name: string, cb: a
 mock.module('@tauri-apps/api/core', () => ({ invoke: async (command: string, args: any) => {
   calls.push(command);
   argumentsByCommand.push([command, args]);
-  if (command === 'whisper_get_available_models') return [{ name: 'large-v3-turbo-q5_0', status: whisperStatus }];
+  if (command === 'whisper_get_available_models') return [{ name: 'large-v3', status: whisperStatus }];
   if (command === 'diarization_get_status') return { nemotron_available: nemotronAvailable, active_engine: 'pyannote' };
   if (command === 'uninstall_optional_model') {
     await new Promise<void>((resolve, reject) => pending.set(command, { resolve, reject }));
@@ -73,7 +73,7 @@ test('optional downloads do not gate navigation and survive leaving onboarding',
   await act(async () => pending.get('whisper_download_model')!.resolve());
   expect(current.jobs.whisper.status).toBe('ready');
   expect(current.jobs.whisper.enabled).toBe(true);
-  expect(argumentsByCommand).toContainEqual(['whisper_download_model', { modelName: 'large-v3-turbo-q5_0', enablePostCall: true }]);
+  expect(argumentsByCommand).toContainEqual(['whisper_download_model', { modelName: 'large-v3', enablePostCall: true }]);
   expect(calls).not.toContain('api_save_post_call_transcript_config');
 });
 
@@ -96,7 +96,7 @@ test('activation errors stay retryable without reporting the model enabled', asy
   await act(async () => current.startDownload('whisper'));
   expect(current.jobs.whisper.status).toBe('activation-error');
   expect(current.jobs.whisper.enabled).not.toBe(true);
-  expect(argumentsByCommand).toContainEqual(['whisper_download_model', { modelName: 'large-v3-turbo-q5_0', enablePostCall: true }]);
+  expect(argumentsByCommand).toContainEqual(['whisper_download_model', { modelName: 'large-v3', enablePostCall: true }]);
   activationFails = false;
   await act(async () => current.startDownload('whisper'));
   expect(current.jobs.whisper.enabled).toBe(true);
@@ -106,10 +106,10 @@ test('an existing native Whisper download hands activation ownership to the nati
   whisperStatus = { Downloading: 20 };
   await act(async () => { root = create(<App page="setup" />); });
   await act(async () => current.startDownload('whisper'));
-  expect(argumentsByCommand).toContainEqual(['whisper_download_model', { modelName: 'large-v3-turbo-q5_0', enablePostCall: true }]);
+  expect(argumentsByCommand).toContainEqual(['whisper_download_model', { modelName: 'large-v3', enablePostCall: true }]);
   expect(calls).not.toContain('api_save_post_call_transcript_config');
   whisperStatus = 'Available';
-  await act(async () => listeners.get('model-download-complete')!({ payload: { modelName: 'large-v3-turbo-q5_0' } }));
+  await act(async () => listeners.get('model-download-complete')!({ payload: { modelName: 'large-v3' } }));
   expect(current.jobs.whisper.enabled).not.toBe(true);
   await act(async () => pending.get('whisper_download_model')!.resolve());
   expect(current.jobs.whisper.enabled).toBe(true);

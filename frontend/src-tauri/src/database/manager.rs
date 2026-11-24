@@ -467,4 +467,34 @@ mod tests {
         let error = DatabaseManager::run_migrations(&pool).await.unwrap_err();
         assert!(error.to_string().contains("schema differs"));
     }
+
+    /// sqlx stores a checksum of each migration file's bytes. A Windows checkout
+    /// that converts a new file to CRLF produces a different checksum than the
+    /// one released builds applied, and the app then refuses to start. Every
+    /// migration added since the line-ending rule exists must be pinned to LF.
+    #[test]
+    fn every_new_migration_is_pinned_to_lf_line_endings() {
+        const FIRST_PINNED_VERSION: u64 = 20260811000000;
+        let crate_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let attributes = std::fs::read_to_string(crate_dir.join("../../.gitattributes")).unwrap();
+        let mut unpinned = Vec::new();
+        for entry in std::fs::read_dir(crate_dir.join("migrations")).unwrap() {
+            let path = entry.unwrap().path();
+            let name = path.file_name().unwrap().to_string_lossy().into_owned();
+            let version = name
+                .split('_')
+                .next()
+                .and_then(|prefix| prefix.parse::<u64>().ok());
+            if !name.ends_with(".sql") || version.map_or(true, |version| version < FIRST_PINNED_VERSION) {
+                continue;
+            }
+            let expected = format!("frontend/src-tauri/migrations/{name} text eol=lf");
+            if !attributes.lines().any(|line| line.trim() == expected) {
+                unpinned.push(name.clone());
+            }
+            let bytes = std::fs::read(&path).unwrap();
+            assert!(!bytes.contains(&b'\r'), "{name} contains CR bytes in this checkout");
+        }
+        assert!(unpinned.is_empty(), "add `text eol=lf` entries to .gitattributes for: {unpinned:?}");
+    }
 }

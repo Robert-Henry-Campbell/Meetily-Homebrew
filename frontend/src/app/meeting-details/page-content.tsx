@@ -16,6 +16,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { TemplateEditorModal } from '@/components/MeetingDetails/TemplateEditorModal';
 import { MeetingExportDialog } from '@/components/MeetingDetails/MeetingExportDialog';
 import { PostCallProcessingDialog } from '@/components/MeetingDetails/PostCallProcessingDialog';
+import { PostCallNotice } from '@/components/MeetingDetails/PostCallNotice';
 import { ModelConfig } from '@/components/ModelSettingsModal';
 import { VirtualizedTranscriptView } from '@/components/VirtualizedTranscriptView';
 import { MeetingHeader } from '@/components/meeting/MeetingHeader';
@@ -39,9 +40,7 @@ import { displayTitle } from '@/lib/meeting-titles';
 import { cn } from '@/lib/utils';
 import { displaySpeaker, speakerColorIndexMap, speakerKey } from '@/utils/speakerUtils';
 
-// Page remounts join the same backend-start attempt. Only accepted attempts are
-// persisted in sessionStorage below; failed preflight attempts remain retryable.
-const autoSummaryInFlight = new Map<string, Promise<boolean>>();
+const noop = () => {};
 const NOTES_WIDTH_KEY = 'af-meeting-notes-width';
 const TRANSCRIPT_MIN = 340;
 const DOCUMENT_MIN = 380;
@@ -95,7 +94,6 @@ export default function PageContent({
 
   const [templateEditorOpen, setTemplateEditorOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [postCallDoneFor, setPostCallDoneFor] = useState<string | null>(null);
   const [documentWidth, setDocumentWidth] = useState(520);
   const [stacked, setStacked] = useState(false);
   const [draggingSplit, setDraggingSplit] = useState(false);
@@ -237,34 +235,17 @@ export default function PageContent({
     aiSummary: meetingData.aiSummary,
   });
 
-  // Auto-generate after a recording (or when the policy asks for it).
+  // Auto-generate when the policy asks for it. The summary that follows a
+  // recording is not started here: the app-level post-call job owner
+  // (PostCallJobsContext) starts it when transcript and speakers are final, so
+  // it also runs when this page is closed. useSummaryGeneration shows that run.
   useEffect(() => {
     const run = async () => {
       // The Labs choice decides which text the summary is written from.
       if (!labsReady) return;
       if (!shouldAutoGenerate || meetingData.transcripts.length === 0) return;
-      if (isPostCallRecording && postCallDoneFor !== meeting.id) return;
       if (isPostCallRecording) {
-        const key = `post-call-summary-started:${meeting.id}`;
-        if (sessionStorage.getItem(key)) {
-          onAutoGenerateComplete?.();
-          return;
-        }
-        let attempt = autoSummaryInFlight.get(meeting.id);
-        if (!attempt) {
-          attempt = summaryGeneration.handleGenerateSummary('');
-          autoSummaryInFlight.set(meeting.id, attempt);
-        }
-        let accepted = false;
-        try {
-          accepted = await attempt;
-        } finally {
-          if (autoSummaryInFlight.get(meeting.id) === attempt) autoSummaryInFlight.delete(meeting.id);
-        }
-        if (accepted) {
-          sessionStorage.setItem(key, 'started');
-          onAutoGenerateComplete?.();
-        }
+        onAutoGenerateComplete?.();
         return;
       }
       await summaryGeneration.handleGenerateSummary('');
@@ -277,7 +258,6 @@ export default function PageContent({
     meeting.id,
     meetingData.transcripts.length,
     isPostCallRecording,
-    postCallDoneFor,
     summaryGeneration.handleGenerateSummary,
     onAutoGenerateComplete,
   ]);
@@ -431,6 +411,7 @@ export default function PageContent({
         }}
         onTranscriptChanged={() => refreshAfterSpeakerChange()}
       />
+      <PostCallNotice meetingId={meeting.id} meetingFolderPath={meeting.folder_path} />
 
       <div
         ref={frameRef}
@@ -568,7 +549,7 @@ export default function PageContent({
         meetingId={meeting.id}
         meetingFolderPath={meeting.folder_path}
         onRefetchTranscripts={onRefetchTranscripts}
-        onComplete={() => setPostCallDoneFor(meeting.id)}
+        onComplete={noop}
       />
     </motion.div>
   );

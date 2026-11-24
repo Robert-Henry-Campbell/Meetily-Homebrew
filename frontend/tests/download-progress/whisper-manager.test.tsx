@@ -26,7 +26,7 @@ afterEach(async () => { await act(async () => root?.unmount()); listeners.clear(
 
 test('optional native completion does not let another Whisper manager change live selection', async () => {
   await act(async () => { root = create(<ModelManager autoSave onModelSelect={selected} />); });
-  await act(async () => listeners.get('model-download-complete')!({ payload: { modelName: 'large-v3-turbo-q5_0', postCallManaged: true } }));
+  await act(async () => listeners.get('model-download-complete')!({ payload: { modelName: 'large-v3', postCallManaged: true } }));
   expect(selected).not.toHaveBeenCalled();
   expect(commands).not.toContain('api_save_transcript_config');
   expect(succeeded).not.toHaveBeenCalled();

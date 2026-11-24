@@ -4,9 +4,9 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { toast } from 'sonner';
-import { OPTIONAL_MODEL_PREFERENCES_CHANGED } from '@/lib/optional-model-activation';
+import { OPTIONAL_MODEL_PREFERENCES_CHANGED, OPTIONAL_WHISPER_MODEL } from '@/lib/optional-model-activation';
 
-export const OPTIONAL_WHISPER_MODEL = 'large-v3-turbo-q5_0';
+export { OPTIONAL_WHISPER_MODEL };
 export type OptionalModel = 'whisper' | 'nemotron';
 export type OptionalDownload = {
   status: 'idle' | 'downloading' | 'activating' | 'ready' | 'error' | 'activation-error' | 'uninstalling';
