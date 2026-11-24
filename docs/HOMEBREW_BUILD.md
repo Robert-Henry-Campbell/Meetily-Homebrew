@@ -69,15 +69,14 @@ bootstrapper, code signing and updater artifacts.
 
 1. GitHub, the fork, tab Actions. If workflows are disabled, enable them
    ("I understand my workflows, go ahead and enable them").
-2. Start the build by creating the branch `build/homebrew-installer` from
-   `homebrew` (Code tab, branch menu, type the name, "Create branch
-   build/homebrew-installer from homebrew"). A push to that branch starts the
-   workflow. For a later build, delete the branch and create it again, or
-   push the newer `homebrew` commit to it.
-3. When the run has finished (about 40 to 70 minutes the first time), open it
-   in the Actions tab and download the artifact
-   `meetily-homebrew-windows-x64-vulkan`. It contains the installer and
-   `SHA256SUMS.txt`.
+2. A push to the branch `build/homebrew-installer` starts the workflow. The
+   branch exists; for a new build, push the newer `homebrew` commit to it
+   (`git push origin homebrew:build/homebrew-installer`), or delete the branch
+   in the GitHub web interface and create it again from `homebrew`.
+3. When the run has finished (about 22 minutes with the build cache, about
+   40 without), open it in the Actions tab and download the artifact
+   `meetily-homebrew-windows-x64-vulkan`. It is a ZIP with the installer and
+   `SHA256SUMS.txt`. GitHub keeps it for 30 days.
 
 GitHub shows the "Run workflow" button only for workflows on the default
 branch. `main` is the default branch and stays identical to the base, so the
@@ -162,6 +161,12 @@ from an address that answers "Not Found". Tauri's bundler fetches its own NSIS.
 | 2026-11-24, third run | With Rust 1.97.0 and `ORT_LIB_LOCATION` the app compiled for Windows (16 minutes) and its imports were listed; `vulkan-1.dll` is among them. The run stopped in the base's NSIS progress plugin script, at its NSIS download. |
 | 2026-11-24, fourth run | The installer was built and uploaded (16 minutes with the cache). Smoke test: the silent install passed, the files were in `%LOCALAPPDATA%\Meetily-Homebrew`, and no stock folder appeared. The start check failed with "DLL not found" (exit code -1073741515): the build machine has no Vulkan loader and the Vulkan SDK step provides none. |
 | 2026-11-24, fifth run | Green. With the loader from LunarG's runtime components (signature valid) the installed app started on the build machine, loaded ONNX Runtime 1.22.0 and created its database after about 10 seconds. The silent uninstall left only `data` and `uninstall.exe`. |
+| 2026-11-24, sixth run | Green, with the stricter start check: the app's log shows "Database opened successfully" and "Fresh database initialized successfully" on Windows. Built from commit `5830231`; installer SHA-256 `946c790e4a28654c6a91ceae82af9054bd62e2666ffab21871d1aae160963ddc`. |
+
+What these runs do not cover, because the build machine has no microphone,
+no graphics driver and no accounts: recording, transcription with Whisper
+large-v3 on real graphics, speaker labels, summaries through Claude, and the
+Google sign-in with Drive and Calendar. The checks on the PC below cover them.
 
 The installer is unsigned. Windows SmartScreen shows "Windows protected your
 PC"; choose "More info", then "Run anyway". The first start downloads about
