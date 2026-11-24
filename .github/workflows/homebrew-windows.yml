@@ -32,10 +32,11 @@ env:
 jobs:
   build:
     name: Build unsigned installer (x64, Vulkan)
-    # Pinned: this image ships Visual Studio 2022. The build script fetches
-    # LLVM 18 (needed for the whisper.cpp bindings) if the image has another.
+    # Pinned: this image ships Visual Studio 2022 and 7-Zip.
     runs-on: windows-2022
-    timeout-minutes: 180
+    # Each long step has its own limit as well, so that a stalled tool costs
+    # minutes. The first run sat in a download for three hours.
+    timeout-minutes: 150
 
     steps:
       - name: Checkout
@@ -62,6 +63,8 @@ jobs:
         with:
           workspaces: ". -> target"
           key: homebrew-windows-vulkan-v1
+          # A retry after a late failure does not recompile everything.
+          cache-on-failure: true
 
       - name: Install Vulkan SDK
         uses: humbletim/install-vulkan-sdk@v1.2
@@ -71,13 +74,20 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
+        timeout-minutes: 15
         run: pnpm install --frozen-lockfile
+
+      # The build machine's own LLVM is newer than 18, the version the base
+      # project generates the whisper.cpp bindings with. The script passes
+      # the folder to the build as MEETILY_LLVM_DIR.
+      - name: Install LLVM 18
+        shell: pwsh
+        timeout-minutes: 15
+        run: ./frontend/scripts/install-llvm18-windows.ps1 -Destination (Join-Path $env:RUNNER_TEMP 'llvm-18')
 
       - name: Build the installer
         shell: pwsh
-        env:
-          # Lets the LLVM bootstrap script download from GitHub if the image's LLVM is not version 18.
-          GH_TOKEN: ${{ github.token }}
+        timeout-minutes: 120
         run: ./frontend/scripts/build-homebrew-windows.ps1
 
       - name: Upload the installer
@@ -106,4 +116,5 @@ jobs:
       # starts the app until its database exists, and removes it again.
       - name: Smoke test (install, start, folders)
         shell: pwsh
+        timeout-minutes: 15
         run: ./frontend/scripts/smoke-test-homebrew-windows.ps1

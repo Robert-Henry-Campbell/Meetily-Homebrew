@@ -110,10 +110,32 @@ only on a PC whose graphics driver provides the Vulkan loader; current AMD
 and Intel drivers do. The build machine has no graphics driver, so the smoke
 test borrows the loader from the Vulkan SDK.
 
-State on 2026-11-24: the build script, the smoke test and the workflow are
-written and reviewed against the base's maintained scripts. None of them has
-run: this repository's development environment is Linux without PowerShell,
-and Actions was not enabled on the fork. The first run is the test.
+### LLVM 18
+
+The base's scripts generate the whisper.cpp bindings with LLVM 18. GitHub's
+`windows-2022` machines ship a newer LLVM (20.1.8 in November 2026), so the
+workflow runs `frontend/scripts/install-llvm18-windows.ps1` before the build.
+It downloads the official `LLVM-18.1.8-win64.exe` with a time limit, checks a
+pinned SHA-256, and unpacks `libclang.dll`, `clang.exe` and clang's headers
+with 7-Zip (256 MB instead of 2.8 GB). The build script reads the folder from
+`MEETILY_LLVM_DIR`.
+
+The base's own helper, `bootstrap-llvm18.ps1`, is not used here. In the first
+run of this workflow it printed "Downloading portable LLVM 18" and then
+nothing for three hours, until the job's limit. It fetches a `.tar.xz` with
+`gh release download` and unpacks it with Windows `tar`; neither has a time
+limit, and the `tar` of Windows Server 2022 cannot read xz by itself. The log
+does not show which of the two stalled.
+
+On a build machine the build script uses no fallback helper at all: a missing
+LLVM 18, or a Vulkan SDK without `glslc.exe`, stops the build at once with a
+message. Every long step of the workflow has a time limit.
+
+### Runs
+
+| Date | Result |
+| --- | --- |
+| 2026-11-24, first run | Cancelled by the three-hour limit in the LLVM download described above. All earlier steps passed. |
 
 The installer is unsigned. Windows SmartScreen shows "Windows protected your
 PC"; choose "More info", then "Run anyway". The first start downloads about

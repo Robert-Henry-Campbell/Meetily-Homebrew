@@ -20,11 +20,24 @@ $product = $config.productName
 $mainBinary = "$($config.mainBinaryName).exe"
 if (-not $config.mainBinaryName) { throw 'tauri.conf.json has no mainBinaryName; this script is for the homebrew branch' }
 
-function Invoke-Checked([string]$What, [scriptblock]$Command) {
+# A GitHub build machine gets its tools from workflow steps. There a missing
+# tool stops the build at once; the fallbacks below are for a developer's PC.
+$onBuildMachine = $env:GITHUB_ACTIONS -eq 'true'
+
+function Write-Phase([string]$What) {
   Write-Host ""
-  Write-Host "=== $What ==="
+  Write-Host "=== [$(Get-Date -Format 'HH:mm:ss')] $What ==="
+}
+
+function Invoke-Checked([string]$What, [scriptblock]$Command) {
+  Write-Phase $What
   & $Command
   if ($LASTEXITCODE -ne 0) { throw "$What failed (exit code $LASTEXITCODE)" }
+}
+
+Write-Phase 'Tools'
+Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Free } | ForEach-Object {
+  Write-Host ("Drive {0}: {1:N1} GB free" -f $_.Name, ($_.Free / 1073741824))
 }
 
 # --- C++ toolchain -----------------------------------------------------------
@@ -43,14 +56,22 @@ $env:CMAKE_GENERATOR = 'Ninja'
 Remove-Item Env:CMAKE_GENERATOR_INSTANCE -ErrorAction SilentlyContinue
 $ninja = Join-Path $vsInstall 'Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja'
 $env:PATH = "$ninja;$env:PATH"
+# CMake 4 refuses projects that declare a minimum below 3.5, which some of the
+# bundled C libraries do. CMake 3 ignores this variable.
+$env:CMAKE_POLICY_VERSION_MINIMUM = '3.5'
+$cmake = Get-Command 'cmake.exe' -ErrorAction SilentlyContinue
+if (-not $cmake) { throw 'cmake.exe is not on PATH' }
+Write-Host "CMake: $(& $cmake.Source --version | Select-Object -First 1) ($($cmake.Source))"
 
 # --- LLVM 18 (whisper-rs generates its Windows bindings with libclang) --------
 $llvm = if ($env:MEETILY_LLVM_DIR) { $env:MEETILY_LLVM_DIR } else { 'C:\Program Files\LLVM' }
 $clang = Join-Path $llvm 'bin\clang.exe'
 $clangVersion = if (Test-Path -LiteralPath $clang) { (& $clang --version | Select-Object -First 1) } else { '' }
 if ($clangVersion -notmatch 'version 18\.') {
+  # Not the base's bootstrap-llvm18.ps1: it stalled on a build machine for
+  # hours (see install-llvm18-windows.ps1).
   Write-Host "LLVM at '$llvm' is '$clangVersion'; fetching LLVM 18"
-  $llvm = & (Join-Path $PSScriptRoot 'bootstrap-llvm18.ps1') | Select-Object -Last 1
+  $llvm = & (Join-Path $PSScriptRoot 'install-llvm18-windows.ps1') | Select-Object -Last 1
 }
 $env:LIBCLANG_PATH = Join-Path $llvm 'bin'
 if (-not (Test-Path -LiteralPath (Join-Path $env:LIBCLANG_PATH 'libclang.dll'))) { throw "libclang.dll not found under $llvm" }
@@ -60,10 +81,18 @@ Write-Host "LIBCLANG_PATH = $env:LIBCLANG_PATH"
 # --- Vulkan SDK ---------------------------------------------------------------
 $vulkanSdk = $env:VULKAN_SDK
 if (-not $vulkanSdk -or -not (Test-Path -LiteralPath (Join-Path $vulkanSdk 'Bin\glslc.exe'))) {
+  if ($onBuildMachine) {
+    $bin = if ($vulkanSdk) { Join-Path $vulkanSdk 'Bin' } else { '' }
+    $found = if ($bin -and (Test-Path -LiteralPath $bin)) { (Get-ChildItem -LiteralPath $bin -Filter '*.exe' | ForEach-Object { $_.Name }) -join ', ' } else { 'no Bin folder' }
+    throw "The Vulkan SDK at '$vulkanSdk' has no Bin\glslc.exe (programs found: $found)"
+  }
   Write-Host 'VULKAN_SDK has no glslc; building the portable Vulkan build tools'
   $vulkanSdk = & (Join-Path $PSScriptRoot 'bootstrap-vulkan-build-tools.ps1') | Select-Object -Last 1
 }
 $vulkanSdk = [System.IO.Path]::GetFullPath($vulkanSdk)
+foreach ($required in @('Lib\vulkan-1.lib', 'Include\vulkan\vulkan.h')) {
+  if (-not (Test-Path -LiteralPath (Join-Path $vulkanSdk $required))) { throw "The Vulkan SDK at '$vulkanSdk' lacks $required" }
+}
 $env:VULKAN_SDK = $vulkanSdk
 $env:VK_SDK_PATH = $vulkanSdk
 $env:Vulkan_LIBRARY = Join-Path $vulkanSdk 'Lib\vulkan-1.lib'
