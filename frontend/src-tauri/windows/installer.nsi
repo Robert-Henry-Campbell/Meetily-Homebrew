@@ -100,7 +100,7 @@ Var MeetilyInstallProgress
 Var MeetilyDisplayedProgress
 
 Name "${PRODUCTNAME}"
-BrandingText "Meetily - Actually Free"
+BrandingText "Meetily Homebrew"
 OutFile "${OUTFILE}"
 
 ; We don't actually use this value as default install path,
@@ -196,7 +196,7 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 ; Hide the grey header bitmap strip separators as much as MUI allows
 !define MUI_HEADER_TRANSPARENT_TEXT
 
-!define MUI_WELCOMEPAGE_TITLE "Welcome to Meetily"
+!define MUI_WELCOMEPAGE_TITLE "Welcome to Meetily Homebrew"
 !define MUI_WELCOMEPAGE_TITLE_3LINES
 !define MUI_WELCOMEPAGE_TEXT "Private meeting capture, transcription, and summaries — entirely on your PC.$\r$\n$\r$\nSetup will install Meetily and local runtimes (WebView2, Visual C++, CUDA libraries).$\r$\n$\r$\nNothing is uploaded. Click Next to continue."
 
@@ -419,7 +419,7 @@ Function MeetilyDarkenInstFiles
   FindWindow $R0 "#32770" "" $HWNDPARENT
 
   ${If} $UpdateMode = 1
-    SendMessage $HWNDPARENT ${WM_SETTEXT} 0 "STR:Meetily - Actually Free Updater"
+    SendMessage $HWNDPARENT ${WM_SETTEXT} 0 "STR:Meetily Homebrew Updater"
     !insertmacro MUI_HEADER_TEXT "Updating Meetily" "Updating app files and refreshing local AI runtimes..."
     GetDlgItem $R1 $HWNDPARENT 1028
     SendMessage $R1 ${WM_SETTEXT} 0 "STR:Meetily updater  ·  local AI meetings"
@@ -1008,7 +1008,11 @@ Function .onInit
         StrCpy $INSTDIR "$PROGRAMFILES\${PRODUCTNAME}"
       ${EndIf}
     !else if "${INSTALLMODE}" == "currentUser"
-      StrCpy $INSTDIR "$LOCALAPPDATA\Meetily-ActuallyFree"
+      ; This build's own folder. The base project installs to
+      ; "$LOCALAPPDATA\Meetily-ActuallyFree" and keeps its database in
+      ; "data" beneath it; sharing that folder would hand the stock app a
+      ; database it cannot open.
+      StrCpy $INSTDIR "$LOCALAPPDATA\Meetily-Homebrew"
     !endif
 
     Call RestorePreviousInstallLocation

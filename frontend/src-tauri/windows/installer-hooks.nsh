@@ -358,7 +358,7 @@ Var MeetilyCudaNotice
 !macro NSIS_HOOK_PREINSTALL
   SetDetailsPrint both
   DetailPrint "────────────────────────────────────────"
-  DetailPrint " Meetily - Actually Free"
+  DetailPrint " Meetily Homebrew"
   ${If} $UpdateMode == 1
     DetailPrint " Updating app files…"
   ${Else}

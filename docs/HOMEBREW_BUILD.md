@@ -26,13 +26,20 @@ shares nothing with it:
 | Name | Meetily - Actually Free | Meetily Homebrew |
 | Identifier | `com.meetily.ai` | `com.meetily.homebrew` |
 | Executable | `meetily.exe` | `meetily-homebrew.exe` |
-| Install and data folder | its own | `%LOCALAPPDATA%\Meetily Homebrew`, data in `data\` beside the executable |
+| Install folder | `%LOCALAPPDATA%\Meetily-ActuallyFree` | `%LOCALAPPDATA%\Meetily-Homebrew` |
+| Data (database, models, templates) | `data\` in its install folder; `%APPDATA%\Meetily` if that is not writable | `data\` in its own install folder; `%APPDATA%\Meetily Homebrew` if that is not writable |
+| Default recordings folder | `Music\meetily-recordings` | `Music\meetily-homebrew-recordings` |
 
 Reasons for each difference:
 
 - The database of this build has tables and triggers the stock build does not
   know. sqlx refuses to open a database with migrations it does not have, so
-  the two must never share a data folder.
+  the two must never share a data folder. Three names keep them apart: the
+  install folder in `windows/installer.nsi` (the base's template names the
+  stock folder literally), the fallback folder in `src/paths.rs`, and the
+  recordings folder in `src/audio/recording_preferences.rs`.
+- Nothing is copied from a stock install. This build starts with no meetings
+  and downloads its own models.
 - The installer and the uninstaller close a running app by executable name.
   With its own name, installing or removing this build never closes a stock
   Meetily that is recording.

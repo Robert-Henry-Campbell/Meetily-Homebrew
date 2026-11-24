@@ -1,7 +1,7 @@
 //! Platform-safe local path resolution.
 //!
 //! Windows and Linux prefer a self-contained `data` directory beside the
-//! executable. macOS always uses `~/Library/Application Support/Meetily` because
+//! executable. macOS always uses `~/Library/Application Support/Meetily Homebrew` because
 //! its executable lives inside the signed app bundle; writing runtime data there
 //! invalidates the bundle signature.
 //!
@@ -15,8 +15,11 @@ use std::sync::OnceLock;
 /// The subfolder (relative to the executable) that holds portable app data.
 #[cfg(not(target_os = "macos"))]
 const DATA_SUBDIR: &str = "data";
-/// Folder name used under the OS data directory.
-const FALLBACK_APP_NAME: &str = "Meetily";
+/// Folder name used under the OS data directory. Deliberately not "Meetily":
+/// this personal build must never share a database or a models folder with a
+/// stock install, whose build cannot open a database that carries this build's
+/// migrations.
+const FALLBACK_APP_NAME: &str = "Meetily Homebrew";
 
 static ROOT: OnceLock<PathBuf> = OnceLock::new();
 
