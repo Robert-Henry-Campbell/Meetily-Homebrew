@@ -67,17 +67,55 @@ after labelling: that voice is renamed through the existing
 `rename_meeting_speaker`. Every other case is left to the user; a model's
 speaker number is not an identity.
 
+## Claude summaries and the local takeover
+
+`src-tauri/src/summary/claude_api.rs` holds the Claude request (raw HTTP; there
+is no official Rust SDK). `llm_client::generate_summary` calls it for the
+`claude` provider.
+
+- API version `2026-10-21`, streaming, no sampling parameters, no `thinking`
+  field. Text is read from the stream; thinking is never part of a summary.
+- The default model is `claude-opus-5-5`. The default output budget in
+  `lib/claude-output-limits.json` is 32,000 tokens, because thinking counts
+  toward the limit on current models.
+- Refusal fallback is enabled: the request carries `fallbacks: "default"` with
+  the beta header `server-side-fallback-2026-07-01`, so a request that a safety
+  classifier declines is re-run by the API on the model Anthropic recommends.
+  A model or account that rejects the beta gets the same request without it.
+- `stop_reason` decides whether a response is complete. `max_tokens`,
+  `refusal` and unknown reasons never become a stored summary.
+- Rate limits, 5xx and network failures repeat up to three attempts and honour
+  `retry-after` up to 60 seconds. A request has no fixed 60 or 300 second
+  limit; a stream that is silent for 180 seconds counts as cut off.
+- Failures are typed (`ClaudeFailureKind`). The kind reaches
+  `summary/service.rs` through the task-local `LAST_CLAUDE_FAILURE`, because
+  the pipeline passes errors as text.
+
+When Claude fails for a lasting reason (no key or rejected key, billing,
+permission, unknown model, spend limit, rate limit or outage after the
+retries, unreachable, declined), `service.rs` writes the summary with the best
+completely downloaded local model (`models::first_downloaded_model`). The
+stored result carries `generated_by` (`provider`, `model`, `fallback_reason`);
+`MeetingDocument.tsx` shows the reason above the summary. A wrong request, a
+truncated answer and a cancellation are reported and not taken over.
+
 ## Tests
 
 - Native: `cargo test -p meetily --lib post_call::` (stored stages, names,
   delete trigger, labels) and `database::manager` (migration LF guard).
+- Native: `summary::claude_api` (request shape, stream parsing with split
+  multi-byte text, refusal continuation, error classes, retries, silence,
+  cancellation) against a loopback fake server; `summary::service` (author
+  field, takeover classes); `summary_engine::models` (takeover model choice).
 - Frontend: `tests/post-call/auto-chain.test.tsx`,
   `tests/post-call/summary-start.test.ts`, `tests/lib/post-call-jobs.test.ts`,
   `tests/hooks/summary-external-start.test.tsx`, and the updated
   `tests/post-call-jobs.test.tsx`.
 
-All of these use mocked IPC or a temporary database. None runs a model or
-reads audio.
+All of these use mocked IPC, a temporary database or a loopback fake server.
+None runs a model, reads audio, or contacts Anthropic. The takeover path in
+`service.rs` as a whole (Claude failure followed by a real local generation)
+is not covered by an automated test.
 
 ## Limits
 

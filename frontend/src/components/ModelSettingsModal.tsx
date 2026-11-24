@@ -101,11 +101,14 @@ const OPENAI_FALLBACK_MODELS = [
   'o3-mini',
 ];
 
+// Shown before a key is entered or when the list cannot be fetched. The first
+// entry is the default for a new Claude setup; keep it in step with
+// `claude_api::DEFAULT_CLAUDE_MODEL`.
 const CLAUDE_FALLBACK_MODELS = [
-  'claude-sonnet-4-5-20250929',
-  'claude-haiku-4-5-20251001',
-  'claude-opus-4-5-20251101',
-  'claude-3-5-sonnet-latest',
+  'claude-opus-5-5',
+  'claude-sonnet-5-5',
+  'claude-haiku-5-5',
+  'claude-fable-5-2',
 ];
 
 const GROQ_FALLBACK_MODELS = [

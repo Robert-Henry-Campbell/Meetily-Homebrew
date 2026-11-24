@@ -1,6 +1,7 @@
 use crate::database::repositories::{
     meeting::MeetingsRepository, setting::SettingsRepository, summary::SummaryProcessesRepository,
 };
+use crate::summary::claude_api::{ClaudeFailureKind, LAST_CLAUDE_FAILURE};
 use crate::summary::llm_client::LLMProvider;
 use crate::summary::language_detection::detect_summary_language;
 use crate::summary::metadata::read_detected_summary_language_from_metadata;
@@ -138,14 +139,28 @@ fn normalise_summary_language_for_cache(summary_language: Option<&str>) -> Optio
     language_name_from_code(summary_language?.trim()).map(str::to_string)
 }
 
+/// Which model wrote a stored summary. `fallback_reason` is set when the local
+/// model took over from Claude; the meeting page and the Drive export show it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct SummaryAuthor {
+    pub provider: String,
+    pub model: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback_reason: Option<String>,
+}
+
+pub(crate) const SUMMARY_AUTHOR_FIELD: &str = "generated_by";
+
 fn build_summary_result_json(
     final_markdown: &str,
     english_markdown: &str,
     source: SummaryCacheSource,
     output_language: Option<&str>,
+    author: &SummaryAuthor,
 ) -> serde_json::Value {
     serde_json::json!({
         "markdown": strip_title_if_present(final_markdown),
+        SUMMARY_AUTHOR_FIELD: author,
         ENGLISH_CACHE_FIELD: EnglishSummaryCache {
             markdown: english_markdown.to_string(),
             source,
@@ -382,6 +397,9 @@ impl SummaryService {
         } else {
             match SettingsRepository::get_api_key(&pool, &model_provider).await {
                 Ok(Some(key)) if !key.is_empty() => key,
+                // Without a Claude key the request is not sent; the local model
+                // takes over below, as it does when Claude rejects a key.
+                Ok(None) | Ok(Some(_)) if provider == LLMProvider::Claude => String::new(),
                 Ok(None) | Ok(Some(_)) => {
                     let err_msg = format!("API key not found for {}", &model_provider);
                     Self::update_process_failed(&pool, &meeting_id, &err_msg).await;
@@ -603,29 +621,119 @@ impl SummaryService {
         );
 
         let client = reqwest::Client::new();
-        let result = generate_meeting_summary(
-            &client,
-            &provider,
-            &model_name,
-            &final_api_key,
-            &text,
-            &custom_prompt,
-            &template_id,
-            &template,
-            token_threshold,
-            ollama_endpoint.as_deref(),
-            custom_openai_endpoint.as_deref(),
-            final_max_tokens,
-            custom_openai_temperature,
-            custom_openai_top_p,
-            app_data_dir.as_ref(),
-            claude_cli_path.as_deref(),
-            Some(&cancellation_token),
-            summary_language.as_deref(),
-            detected_summary_language.as_deref(),
-            cached_english.as_deref(),
-        )
-        .await;
+        let (mut result, claude_failure) = if provider == LLMProvider::Claude && final_api_key.is_empty() {
+            (
+                Err("No Claude API key is saved. Add one in Settings.".to_string()),
+                Some(ClaudeFailureKind::Authentication),
+            )
+        } else {
+            // The pipeline returns errors as text; the scope keeps the kind of a
+            // failed Claude request so the takeover decision is not a text match.
+            LAST_CLAUDE_FAILURE
+                .scope(std::cell::Cell::new(None), async {
+                    let result = generate_meeting_summary(
+                        &client,
+                        &provider,
+                        &model_name,
+                        &final_api_key,
+                        &text,
+                        &custom_prompt,
+                        &template_id,
+                        &template,
+                        token_threshold,
+                        ollama_endpoint.as_deref(),
+                        custom_openai_endpoint.as_deref(),
+                        final_max_tokens,
+                        custom_openai_temperature,
+                        custom_openai_top_p,
+                        app_data_dir.as_ref(),
+                        claude_cli_path.as_deref(),
+                        Some(&cancellation_token),
+                        summary_language.as_deref(),
+                        detected_summary_language.as_deref(),
+                        cached_english.as_deref(),
+                    )
+                    .await;
+                    (result, LAST_CLAUDE_FAILURE.with(std::cell::Cell::get))
+                })
+                .await
+        };
+
+        // Who wrote the summary: the configured model, or the local model after
+        // Claude failed for a reason that another attempt would not fix.
+        let mut written_by = SummaryAuthor {
+            provider: model_provider.clone(),
+            model: model_name.clone(),
+            fallback_reason: None,
+        };
+        if let (Err(claude_error), Some(kind)) = (&result, claude_failure) {
+            if provider == LLMProvider::Claude && kind.is_lasting() && !cancellation_token.is_cancelled() {
+                let claude_error = claude_error.clone();
+                let local_model = app_data_dir
+                    .as_ref()
+                    .and_then(crate::summary::summary_engine::models::first_downloaded_model);
+                result = match local_model {
+                    None => Err(format!(
+                        "{claude_error} No local summary model is downloaded, so nothing could take over."
+                    )),
+                    Some(local_model) => {
+                        warn!(
+                            "Claude was not used for meeting_id {} ({}); the local model {} takes over",
+                            meeting_id, kind.short_reason(), local_model
+                        );
+                        emit_progress(
+                            "generating",
+                            &format!(
+                                "Writing the summary with the local model {local_model} because {}…",
+                                kind.short_reason()
+                            ),
+                            None,
+                        );
+                        let local_threshold = crate::summary::summary_engine::models::get_model_by_name(&local_model)
+                            .map(|model| model.context_size.saturating_sub(300) as usize)
+                            .unwrap_or(1748);
+                        let local = generate_meeting_summary(
+                            &client,
+                            &LLMProvider::BuiltInAI,
+                            &local_model,
+                            "",
+                            &text,
+                            &custom_prompt,
+                            &template_id,
+                            &template,
+                            local_threshold,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            app_data_dir.as_ref(),
+                            None,
+                            Some(&cancellation_token),
+                            summary_language.as_deref(),
+                            detected_summary_language.as_deref(),
+                            // The cached English text belongs to the Claude run.
+                            None,
+                        )
+                        .await;
+                        match local {
+                            Ok(summary) => {
+                                written_by = SummaryAuthor {
+                                    provider: "builtin-ai".to_string(),
+                                    model: local_model,
+                                    fallback_reason: Some(kind.short_reason().to_string()),
+                                };
+                                Ok(summary)
+                            }
+                            Err(local_error) if local_error.contains("cancelled") => Err(local_error),
+                            Err(local_error) => Err(format!(
+                                "{claude_error} The local model {local_model} was tried instead and failed: {local_error}"
+                            )),
+                        }
+                    }
+                };
+            }
+        }
 
         let duration = start_time.elapsed().as_secs_f64();
 
@@ -650,6 +758,7 @@ impl SummaryService {
                     &english_markdown,
                     cache_source,
                     summary_language.as_deref(),
+                    &written_by,
                 );
 
                 // Update database with completed status
@@ -687,7 +796,14 @@ impl SummaryService {
                             "Summary saved successfully for meeting_id: {}",
                             meeting_id
                         );
-                        emit_progress("completed", "Summary ready", Some(result_json));
+                        let ready = match &written_by.fallback_reason {
+                            Some(reason) => format!(
+                                "Summary ready. The local model {} wrote it because {}.",
+                                written_by.model, reason
+                            ),
+                            None => "Summary ready".to_string(),
+                        };
+                        emit_progress("completed", &ready, Some(result_json));
                     }
                 }
             }
@@ -732,6 +848,42 @@ impl SummaryService {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_author() -> SummaryAuthor {
+        SummaryAuthor { provider: "claude".into(), model: "claude-opus-5-5".into(), fallback_reason: None }
+    }
+
+    #[test]
+    fn a_stored_summary_names_the_model_that_wrote_it() {
+        let configured = build_summary_result_json("# T\nBody", "# T\nBody", sample_cache_source(), None, &test_author());
+        assert_eq!(configured[SUMMARY_AUTHOR_FIELD], serde_json::json!({ "provider": "claude", "model": "claude-opus-5-5" }));
+
+        // After a takeover the reason is stored with the summary, for the page and the export.
+        let takeover = SummaryAuthor {
+            provider: "builtin-ai".into(),
+            model: "qwen3.5:4b".into(),
+            fallback_reason: Some(ClaudeFailureKind::Authentication.short_reason().into()),
+        };
+        let stored = build_summary_result_json("# T\nBody", "# T\nBody", sample_cache_source(), None, &takeover);
+        assert_eq!(stored[SUMMARY_AUTHOR_FIELD]["fallback_reason"], "Claude rejected the API key");
+        let read_back: SummaryAuthor = serde_json::from_value(stored[SUMMARY_AUTHOR_FIELD].clone()).unwrap();
+        assert_eq!(read_back, takeover);
+        // The author field does not disturb the translation cache stored beside it.
+        assert!(stored.get(ENGLISH_CACHE_FIELD).is_some());
+        assert_eq!(stored["markdown"], "Body");
+    }
+
+    #[test]
+    fn only_lasting_claude_failures_hand_the_summary_to_the_local_model() {
+        use ClaudeFailureKind::*;
+        for kind in [Authentication, Billing, Permission, ModelNotFound, SpendLimit, RateLimited, Unavailable, Network, Refused] {
+            assert!(kind.is_lasting(), "{kind:?}");
+        }
+        // A wrong request, a cut-off answer and a cancellation are reported as they are.
+        for kind in [InvalidRequest, Truncated, Cancelled, Protocol] {
+            assert!(!kind.is_lasting(), "{kind:?}");
+        }
+    }
 
     #[test]
     fn summary_registration_rejects_overlap_and_cleans_up_its_own_token() {
@@ -893,6 +1045,7 @@ mod tests {
             "# Meeting\n## Points\nHello",
             source.clone(),
             Some("fr"),
+            &test_author(),
         )
         .to_string();
 
@@ -910,6 +1063,7 @@ mod tests {
             "# Meeting\n## Points\nHello",
             source.clone(),
             Some("fr"),
+            &test_author(),
         )
         .to_string();
 
@@ -928,6 +1082,7 @@ mod tests {
             "# Meeting\n## Points\nHello",
             source,
             Some("fr"),
+            &test_author(),
         )
         .to_string();
 
@@ -1048,6 +1203,7 @@ mod tests {
             "# Meeting\n## Points\nHello",
             source.clone(),
             Some("fr"),
+            &test_author(),
         )
         .to_string();
 
@@ -1070,6 +1226,7 @@ mod tests {
             "# Meeting\n## Points\nHello",
             source.clone(),
             Some("fr"),
+            &test_author(),
         )
         .to_string();
 
@@ -1091,6 +1248,7 @@ mod tests {
             "# English Title\n## Decisions\nDone",
             sample_cache_source(),
             Some("fr"),
+            &test_author(),
         );
 
         assert_eq!(result["markdown"], "## Decisions\nDone");

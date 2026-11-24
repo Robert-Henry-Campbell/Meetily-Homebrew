@@ -466,6 +466,14 @@ function NotesTab({
             </div>
           )}
 
+          {/* The local model took over from Claude; the summary says so until it is edited or regenerated. */}
+          {!generating && hasSummary && aiSummary?.generated_by?.fallback_reason && (
+            <p role="note" className="mb-3 rounded-xl border border-af-warning/35 bg-af-warning/10 px-3.5 py-2.5 text-xs text-af-text-2">
+              The local model {aiSummary.generated_by.model} wrote this summary because {aiSummary.generated_by.fallback_reason}.
+              Regenerate it once Claude is available again.
+            </p>
+          )}
+
           {generating ? (
             <div className="space-y-3 rounded-xl border border-af-border p-4">
               <p className="flex items-center gap-2 text-xs text-af-text-2">

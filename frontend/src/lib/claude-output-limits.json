@@ -1,5 +1,5 @@
 {
-  "defaultTokens": 8192,
+  "defaultTokens": 32000,
   "fallbackLimit": 8192,
   "applicationLimit": 64000,
   "models": [
@@ -17,6 +17,8 @@
     { "prefix": "claude-opus-4", "limit": 32000 },
     { "prefix": "claude-opus-5", "limit": 128000 },
     { "prefix": "claude-sonnet-5", "limit": 128000 },
-    { "prefix": "claude-fable-5", "limit": 128000 }
+    { "prefix": "claude-haiku-5", "limit": 128000 },
+    { "prefix": "claude-fable-5", "limit": 128000 },
+    { "prefix": "claude-mythos-5", "limit": 128000 }
   ]
 }

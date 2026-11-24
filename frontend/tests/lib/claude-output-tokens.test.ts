@@ -3,7 +3,10 @@ import { claudeOutputBudget, parseClaudeOutputTokens } from '../../src/lib/claud
 
 describe('Claude output budget', () => {
   test('uses an application default, with legacy limits and conservative unknown-model fallback', () => {
-    expect(claudeOutputBudget('claude-sonnet-4-5-20250929')).toEqual({ maximum: 64000, defaultTokens: 8192 });
+    // The default leaves room for thinking, which counts toward the limit on current models.
+    expect(claudeOutputBudget('claude-sonnet-4-5-20250929')).toEqual({ maximum: 64000, defaultTokens: 32000 });
+    expect(claudeOutputBudget('claude-opus-5-5')).toEqual({ maximum: 64000, defaultTokens: 32000 });
+    expect(claudeOutputBudget('claude-haiku-5-5').defaultTokens).toBe(32000);
     expect(claudeOutputBudget('claude-3-sonnet-20240229').defaultTokens).toBe(4096);
     expect(claudeOutputBudget('claude-3-5-sonnet-latest').defaultTokens).toBe(8192);
     expect(claudeOutputBudget('claude-unknown').maximum).toBe(8192);

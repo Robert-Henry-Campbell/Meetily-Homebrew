@@ -79,48 +79,6 @@ pub fn claude_max_tokens(model_name: &str, configured: Option<i64>) -> Result<u3
     }
 }
 
-// Claude-specific request structure
-#[derive(Debug, Serialize)]
-pub struct ClaudeRequest {
-    pub model: String,
-    pub max_tokens: u32,
-    pub system: String,
-    pub messages: Vec<ChatMessage>,
-}
-
-// Claude-specific response structure
-#[derive(Deserialize, Debug)]
-pub struct ClaudeChatResponse {
-    pub content: Vec<ClaudeChatContent>,
-    pub stop_reason: Option<String>,
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum ClaudeChatContent {
-    Text { text: String },
-    #[serde(other)]
-    Other,
-}
-
-impl ClaudeChatResponse {
-    fn complete_text(self) -> Result<String, String> {
-        match self.stop_reason.as_deref() {
-            Some("end_turn" | "stop_sequence") => {},
-            Some("max_tokens") => return Err("Claude reached the output limit before completing the summary. Increase Maximum summary length in Model Settings or request a shorter summary, then retry. The incomplete result was not saved.".into()),
-            Some(reason) => return Err(format!("Claude did not complete the response (stop reason: {reason}). Please retry.")),
-            None => return Err("Claude response did not include a completion reason; incomplete output was not accepted.".into()),
-        }
-        let text = self.content.into_iter().filter_map(|block| match block {
-            ClaudeChatContent::Text { text } => Some(text),
-            ClaudeChatContent::Other => None,
-        }).collect::<Vec<_>>().join("\n");
-        let text = text.trim();
-        if text.is_empty() { return Err("No text in Claude response".into()); }
-        Ok(text.to_string())
-    }
-}
-
 /// LLM Provider enumeration for multi-provider support
 #[derive(Debug, Clone, PartialEq)]
 pub enum LLMProvider {
@@ -207,6 +165,23 @@ pub async fn generate_summary(
         .await;
     }
 
+    // Claude has its own request path: streaming, retries, typed failures.
+    if provider == &LLMProvider::Claude {
+        let call = super::claude_api::ClaudeCall {
+            base_url: super::claude_api::CLAUDE_API_BASE,
+            api_key,
+            model: model_name,
+            system_prompt,
+            user_prompt,
+            max_tokens: claude_max_tokens(model_name, max_tokens.map(i64::from))?,
+            timings: Default::default(),
+        };
+        info!("LLM request to Claude: model={}", model_name);
+        return super::claude_api::send_message(client, &call, cancellation_token)
+            .await
+            .map_err(|failure| failure.to_string());
+    }
+
     // Handle BuiltInAI provider separately (uses local sidecar, no HTTP API)
     if provider == &LLMProvider::BuiltInAI {
         let app_data_dir = app_data_dir
@@ -254,20 +229,8 @@ pub async fn generate_summary(
             )
         }
         LLMProvider::Claude => {
-            let mut header_map = header::HeaderMap::new();
-            header_map.insert(
-                "x-api-key",
-                api_key
-                    .parse()
-                    .map_err(|_| "Invalid API key format".to_string())?,
-            );
-            header_map.insert(
-                "anthropic-version",
-                "2023-06-01"
-                    .parse()
-                    .map_err(|_| "Invalid anthropic version".to_string())?,
-            );
-            ("https://api.anthropic.com/v1/messages".to_string(), header_map)
+            // This case is handled earlier with early returns
+            unreachable!("Claude is handled before this match statement")
         }
         LLMProvider::BuiltInAI => {
             // This case is handled earlier with early returns
@@ -279,15 +242,12 @@ pub async fn generate_summary(
         }
     };
 
-    // Add authorization header for non-Claude providers
-    if provider != &LLMProvider::Claude {
-        headers.insert(
-            header::AUTHORIZATION,
-            format!("Bearer {}", api_key)
-                .parse()
-                .map_err(|_| "Invalid authorization header".to_string())?,
-        );
-    }
+    headers.insert(
+        header::AUTHORIZATION,
+        format!("Bearer {}", api_key)
+            .parse()
+            .map_err(|_| "Invalid authorization header".to_string())?,
+    );
     headers.insert(
         header::CONTENT_TYPE,
         "application/json"
@@ -295,42 +255,29 @@ pub async fn generate_summary(
             .map_err(|_| "Invalid content type".to_string())?,
     );
 
-    // Build request body based on provider
-    let request_body = if provider != &LLMProvider::Claude {
-        // For CustomOpenAI, apply optional parameters if provided
-        let (max_tokens_val, temperature_val, top_p_val) = if provider == &LLMProvider::CustomOpenAI {
-            (max_tokens, temperature, top_p)
-        } else {
-            (None, None, None)
-        };
-
-        serde_json::json!(ChatRequest {
-            model: model_name.to_string(),
-            messages: vec![
-                ChatMessage {
-                    role: "system".to_string(),
-                    content: system_prompt.to_string(),
-                },
-                ChatMessage {
-                    role: "user".to_string(),
-                    content: user_prompt.to_string(),
-                }
-            ],
-            max_tokens: max_tokens_val,
-            temperature: temperature_val,
-            top_p: top_p_val,
-        })
+    // For CustomOpenAI, apply optional parameters if provided
+    let (max_tokens_val, temperature_val, top_p_val) = if provider == &LLMProvider::CustomOpenAI {
+        (max_tokens, temperature, top_p)
     } else {
-        serde_json::json!(ClaudeRequest {
-            system: system_prompt.to_string(),
-            model: model_name.to_string(),
-            max_tokens: claude_max_tokens(model_name, max_tokens.map(i64::from))?,
-            messages: vec![ChatMessage {
+        (None, None, None)
+    };
+
+    let request_body = serde_json::json!(ChatRequest {
+        model: model_name.to_string(),
+        messages: vec![
+            ChatMessage {
+                role: "system".to_string(),
+                content: system_prompt.to_string(),
+            },
+            ChatMessage {
                 role: "user".to_string(),
                 content: user_prompt.to_string(),
-            }]
-        })
-    };
+            }
+        ],
+        max_tokens: max_tokens_val,
+        temperature: temperature_val,
+        top_p: top_p_val,
+    });
 
     info!("🐞 LLM Request to {}: model={}", provider_name(provider), model_name);
 
@@ -348,7 +295,7 @@ pub async fn generate_summary(
             result = request_future => {
                 result.map_err(|e| {
                     if e.is_timeout() {
-                        format!("LLM request timed out after 60 seconds")
+                        format!("LLM request timed out after {} seconds", REQUEST_TIMEOUT_DURATION.as_secs())
                     } else {
                         format!("Failed to send request to LLM: {}", e)
                     }
@@ -361,7 +308,7 @@ pub async fn generate_summary(
     } else {
         request_future.await.map_err(|e| {
             if e.is_timeout() {
-                format!("LLM request timed out after 60 seconds")
+                format!("LLM request timed out after {} seconds", REQUEST_TIMEOUT_DURATION.as_secs())
             } else {
                 format!("Failed to send request to LLM: {}", e)
             }
@@ -376,39 +323,21 @@ pub async fn generate_summary(
         return Err(format!("LLM API request failed: {}", error_body));
     }
 
-    // Parse response based on provider
-    if provider == &LLMProvider::Claude {
-        let body = response.json::<ClaudeChatResponse>();
-        let chat_response = if let Some(token) = cancellation_token {
-            tokio::select! {
-                biased;
-                _ = token.cancelled() => return Err("Summary generation was cancelled".into()),
-                result = body => result,
-            }
-        } else {
-            body.await
-        }.map_err(|e| format!("Failed to parse LLM response: {e}"))?;
+    let chat_response = response
+        .json::<ChatResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse LLM response: {}", e))?;
 
-        info!("🐞 LLM Response received from Claude");
+    info!("🐞 LLM Response received from {}", provider_name(provider));
 
-        chat_response.complete_text()
-    } else {
-        let chat_response = response
-            .json::<ChatResponse>()
-            .await
-            .map_err(|e| format!("Failed to parse LLM response: {}", e))?;
-
-        info!("🐞 LLM Response received from {}", provider_name(provider));
-
-        let content = chat_response
-            .choices
-            .get(0)
-            .ok_or("No content in LLM response")?
-            .message
-            .content
-            .trim();
-        Ok(content.to_string())
-    }
+    let content = chat_response
+        .choices
+        .get(0)
+        .ok_or("No content in LLM response")?
+        .message
+        .content
+        .trim();
+    Ok(content.to_string())
 }
 
 /// Helper function to get provider name for logging
@@ -433,37 +362,22 @@ mod claude_output_tests {
     fn validates_budget_without_confusing_model_generations() {
         assert_eq!(claude_max_tokens("claude-3-opus", None).unwrap(), 4096);
         assert_eq!(claude_max_tokens("claude-3-5-sonnet-latest", None).unwrap(), 8192);
-        assert_eq!(claude_max_tokens("claude-sonnet-4-5", None).unwrap(), 8192);
+        // The default leaves room for thinking, which counts toward the limit on
+        // current models; older models keep their own smaller ceilings.
+        assert_eq!(claude_max_tokens("claude-sonnet-4-5", None).unwrap(), 32000);
+        assert_eq!(claude_max_tokens("claude-opus-5-5", None).unwrap(), 32000);
+        assert_eq!(claude_max_tokens("claude-haiku-5-5", None).unwrap(), 32000);
+        assert_eq!(claude_max_tokens("claude-fable-5-2", Some(64000)).unwrap(), 64000);
         assert_eq!(claude_max_tokens("claude-sonnet-4-5", Some(32000)).unwrap(), 32000);
-        assert_eq!(claude_max_tokens("claude-sonnet-4-50-unknown", None).unwrap(), 8192);
+        // A later release of a known family takes that family's ceiling; a name
+        // outside every family gets the conservative fallback.
+        assert_eq!(claude_max_tokens("claude-sonnet-4-50-unknown", None).unwrap(), 32000);
+        assert_eq!(claude_max_tokens("claude-unknown", None).unwrap(), 8192);
         assert!(claude_max_tokens("claude-3-opus", Some(8192)).is_err());
         for value in [0, -1, 64001, i64::MAX] {
             assert!(claude_max_tokens("claude-sonnet-4-5", Some(value)).is_err());
         }
         assert!(claude_max_tokens("claude-unknown", Some(9000)).is_err());
-    }
-
-    #[test]
-    fn incomplete_claude_responses_never_succeed() {
-        for reason in ["max_tokens", "refusal", "pause_turn", "tool_use", "unknown"] {
-            let response: ClaudeChatResponse = serde_json::from_value(serde_json::json!({
-                "stop_reason": reason, "content": [{"type":"text", "text":"A plausible but incomplete summary"}]
-            })).unwrap();
-            assert!(response.complete_text().is_err(), "accepted {reason}");
-        }
-        let missing: ClaudeChatResponse = serde_json::from_str(r#"{"content":[{"type":"text","text":"partial"}]}"#).unwrap();
-        assert!(missing.complete_text().is_err());
-    }
-
-    #[test]
-    fn preserves_all_text_blocks_without_exposing_thinking() {
-        let response: ClaudeChatResponse = serde_json::from_str(r##"{
-            "stop_reason":"end_turn", "content":[
-                {"type":"thinking", "thinking":"private reasoning", "signature":"example"},
-                {"type":"text", "text":"# Summary\nContent"},
-                {"type":"text", "text":"# Decisions\nApproved"}
-            ]}"##).unwrap();
-        assert_eq!(response.complete_text().unwrap(), "# Summary\nContent\n# Decisions\nApproved");
     }
 
     #[tokio::test]

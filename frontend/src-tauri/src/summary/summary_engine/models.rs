@@ -254,6 +254,22 @@ pub fn get_models_directory(app_data_dir: &PathBuf) -> PathBuf {
     app_data_dir.join("models").join("summary")
 }
 
+/// The best local model whose file is completely downloaded, or `None`.
+///
+/// Used when a cloud provider fails and the summary is written locally
+/// instead. The order is quality first; a partial download (smaller than the
+/// catalog size) is not offered.
+pub fn first_downloaded_model(app_data_dir: &PathBuf) -> Option<String> {
+    const BY_PREFERENCE: [&str; 4] = ["qwen3.5:4b", "qwen3.5:2b", "gemma3:4b", "gemma3:1b"];
+    let directory = get_models_directory(app_data_dir);
+    let catalog = get_available_models();
+    BY_PREFERENCE.iter().find_map(|name| {
+        let model = catalog.iter().find(|model| model.name == *name)?;
+        let size = std::fs::metadata(directory.join(&model.gguf_file)).ok()?.len();
+        (size == model.size_bytes).then(|| model.name.clone())
+    })
+}
+
 // ============================================================================
 // Prompt Templates (Model-Specific Formatting)
 // ============================================================================
@@ -497,5 +513,37 @@ mod tests {
         let sanitized = sampling.sanitize_for_llama_helper();
 
         assert_eq!(sanitized.top_k, 20);
+    }
+}
+
+#[cfg(test)]
+mod takeover_model_tests {
+    use super::*;
+
+    /// A sparse file of the catalog size stands in for a downloaded model.
+    fn place(directory: &std::path::Path, name: &str, complete: bool) {
+        let model = get_model_by_name(name).unwrap();
+        let file = std::fs::File::create(directory.join(&model.gguf_file)).unwrap();
+        file.set_len(if complete { model.size_bytes } else { model.size_bytes - 1 }).unwrap();
+    }
+
+    #[test]
+    fn the_best_completely_downloaded_model_is_chosen() {
+        let data = tempfile::tempdir().unwrap();
+        let root = data.path().to_path_buf();
+        assert_eq!(first_downloaded_model(&root), None);
+
+        let models = get_models_directory(&root);
+        std::fs::create_dir_all(&models).unwrap();
+        // A partial download of the preferred model is not offered.
+        place(&models, "qwen3.5:4b", false);
+        assert_eq!(first_downloaded_model(&root), None);
+
+        place(&models, "gemma3:1b", true);
+        assert_eq!(first_downloaded_model(&root).as_deref(), Some("gemma3:1b"));
+        place(&models, "qwen3.5:2b", true);
+        assert_eq!(first_downloaded_model(&root).as_deref(), Some("qwen3.5:2b"));
+        place(&models, "qwen3.5:4b", true);
+        assert_eq!(first_downloaded_model(&root).as_deref(), Some("qwen3.5:4b"));
     }
 }
