@@ -1,0 +1,92 @@
+name: "Homebrew: Windows installer (Vulkan)"
+
+# The unsigned Windows installer of this personal build. Started by hand from
+# the Actions tab, on the `homebrew` branch. Nothing is published: the
+# installer is an artifact of the run.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homebrew-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  NEXT_TELEMETRY_DISABLED: "1"
+  PNPM_CONFIG_ENABLE_GLOBAL_VIRTUAL_STORE: "false"
+
+jobs:
+  build:
+    name: Build unsigned installer (x64, Vulkan)
+    # Pinned: this image ships Visual Studio 2022 and LLVM 18, which the
+    # whisper.cpp bindings need.
+    runs-on: windows-2022
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+          key: homebrew-windows-vulkan-v1
+
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.4.309.0
+          cache: true
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the installer
+        shell: pwsh
+        env:
+          # Lets the LLVM bootstrap script download from GitHub if the image's LLVM is not version 18.
+          GH_TOKEN: ${{ github.token }}
+        run: ./frontend/scripts/build-homebrew-windows.ps1
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: meetily-homebrew-windows-x64-vulkan
+          path: dist-homebrew/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Summary
+        shell: bash
+        run: |
+          {
+            echo "## Meetily Homebrew: Windows installer (Vulkan, unsigned)"
+            echo ""
+            echo '```'
+            cat dist-homebrew/SHA256SUMS.txt
+            echo '```'
+            echo ""
+            echo "Download the artifact \`meetily-homebrew-windows-x64-vulkan\` from this run."
+          } >> "$GITHUB_STEP_SUMMARY"
