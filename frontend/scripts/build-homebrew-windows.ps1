@@ -78,6 +78,17 @@ if (-not (Test-Path -LiteralPath (Join-Path $env:LIBCLANG_PATH 'libclang.dll')))
 Remove-Item Env:WHISPER_DONT_GENERATE_BINDINGS -ErrorAction SilentlyContinue
 Write-Host "LIBCLANG_PATH = $env:LIBCLANG_PATH"
 
+# --- ONNX Runtime --------------------------------------------------------------
+# The app loads ONNX Runtime at run time from binaries\onnxruntime, which its
+# own build script stages and verifies. With this variable set, the ort-sys
+# package downloads and copies nothing during the build (the base's
+# build-labs-test-windows.ps1 sets it too). Without it, ort-sys copies DLLs to
+# a folder it derives from the position of its build folder; under the build
+# folder layout of Rust 1.100 that folder does not exist and the build stops.
+$env:ORT_LIB_LOCATION = Join-Path $tauri 'binaries\onnxruntime'
+Write-Host "ORT_LIB_LOCATION = $env:ORT_LIB_LOCATION"
+Write-Host "Rust: $(rustc --version); $(cargo --version)"
+
 # --- Vulkan SDK ---------------------------------------------------------------
 $vulkanSdk = $env:VULKAN_SDK
 if (-not $vulkanSdk -or -not (Test-Path -LiteralPath (Join-Path $vulkanSdk 'Bin\glslc.exe'))) {

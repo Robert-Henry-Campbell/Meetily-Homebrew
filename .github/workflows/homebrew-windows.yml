@@ -55,14 +55,19 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+      # Pinned to the version this branch is built and tested with on Linux.
+      # Rust 1.100 changed the layout of cargo's build folder, which the
+      # build scripts of some pinned dependencies derive paths from.
+      - name: Install Rust 1.97.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: ". -> target"
-          key: homebrew-windows-vulkan-v1
+          key: homebrew-windows-vulkan-v2
           # A retry after a late failure does not recompile everything.
           cache-on-failure: true
 
