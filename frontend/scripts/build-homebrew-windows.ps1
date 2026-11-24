@@ -17,7 +17,6 @@ $tauri = Join-Path $frontend 'src-tauri'
 $config = Get-Content (Join-Path $tauri 'tauri.conf.json') -Raw | ConvertFrom-Json
 $version = $config.version
 $product = $config.productName
-$mainBinary = "$($config.mainBinaryName).exe"
 if (-not $config.mainBinaryName) { throw 'tauri.conf.json has no mainBinaryName; this script is for the homebrew branch' }
 
 # A GitHub build machine gets its tools from workflow steps. There a missing
@@ -168,9 +167,10 @@ try {
     & $dumpbin.Source /nologo /dependents $appBinary | Where-Object { $_ -match '\.dll\s*$' } | ForEach-Object { Write-Host "  $($_.Trim())" }
   }
 
-  # --- Installer progress plugin ----------------------------------------------
-  & (Join-Path $PSScriptRoot 'build-nsis-progress-plugin.ps1') -ProgressMainBinary $appBinary -MainBinaryName $mainBinary
-  if ($LASTEXITCODE -ne 0) { throw 'NSIS overall-progress plugin build failed' }
+  # The base's NSIS progress plugin (build-nsis-progress-plugin.ps1) is not
+  # built. The installer template uses it only in update mode, and this build
+  # has no updates. On a machine without Tauri's NSIS tools that script also
+  # fails: it downloads NSIS from an address that does not exist.
 } finally { Pop-Location }
 
 # --- Installer -----------------------------------------------------------------

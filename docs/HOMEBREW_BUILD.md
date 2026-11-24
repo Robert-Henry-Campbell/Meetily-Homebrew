@@ -140,12 +140,21 @@ base's `build-labs-test-windows.ps1` does: the app loads ONNX Runtime at run
 time from that folder, which its own build script stages and verifies, so the
 `ort-sys` package has nothing to download or copy during the build.
 
+### NSIS progress plugin
+
+The base's `build-nsis-progress-plugin.ps1` is not run. The installer template
+uses that plugin only in update mode (`/UPDATE`), and this build has no
+updates; a normal install shows its progress without it. On a machine that
+has never bundled with Tauri the script also fails, because it downloads NSIS
+from an address that answers "Not Found". Tauri's bundler fetches its own NSIS.
+
 ### Runs
 
 | Date | Result |
 | --- | --- |
 | 2026-11-24, first run | Cancelled by the three-hour limit in the LLVM download described above. All earlier steps passed. |
 | 2026-11-24, second run | LLVM 18 installed in 19 seconds; the Next.js build and the summary helper compiled. The app build stopped in the build script of `ort-sys` (ONNX Runtime bindings). The build machine had Rust 1.100, whose cargo keeps build folders as `build\<package>\<hash>` instead of `build\<package>-<hash>`; `ort-sys` derives the folder for its DLL copies from that position and found none. |
+| 2026-11-24, third run | With Rust 1.97.0 and `ORT_LIB_LOCATION` the app compiled for Windows (16 minutes) and its imports were listed; `vulkan-1.dll` is among them. The run stopped in the base's NSIS progress plugin script, at its NSIS download. |
 
 The installer is unsigned. Windows SmartScreen shows "Windows protected your
 PC"; choose "More info", then "Run anyway". The first start downloads about
