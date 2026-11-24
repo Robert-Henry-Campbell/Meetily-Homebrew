@@ -9,7 +9,7 @@ import { check } from '@tauri-apps/plugin-updater';
 import { getVersion } from '@tauri-apps/api/app';
 
 /** False in the homebrew build; see `checkForUpdates`. */
-const UPDATES_ENABLED = false;
+export const UPDATES_ENABLED: boolean = false;
 
 export interface UpdateInfo {
   available: boolean;

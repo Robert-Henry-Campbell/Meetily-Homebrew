@@ -48,6 +48,11 @@ Reasons for each difference:
   the base project's feed would replace this app with the stock one.
 - The "CUDA is ready" download offer is removed; it pointed at the base
   project's installer.
+- First-run setup does not ask about update checks, since none run.
+- The crash dialog offers "Save ZIP" and "Ignore" only. The base's "Send
+  Report" opens a new issue on the base project; crashes of this build come
+  from code that project did not write, and this fork has no issue tracker
+  (`services/crashReportService.ts`, `CRASH_REPORT_ISSUE_URL`).
 
 The version stays `0.2.23`. A pre-release suffix was planned and left out,
 because the custom installer template has not been tried with one.

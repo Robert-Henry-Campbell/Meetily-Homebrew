@@ -5,11 +5,13 @@ import { Button } from '@/components/ui/button';
 import { OnboardingContainer } from '../OnboardingContainer';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { usePlatform } from '@/hooks/usePlatform';
+import { UPDATES_ENABLED } from '@/services/updateService';
 
 export function WelcomeStep() {
   const { goNext } = useOnboarding();
   const platform = usePlatform();
-  const updatesSupported = platform !== 'macos';
+  // A build without a release feed has nothing to ask about.
+  const updatesSupported = UPDATES_ENABLED && platform !== 'macos';
   const [checkUpdates, setCheckUpdates] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
 

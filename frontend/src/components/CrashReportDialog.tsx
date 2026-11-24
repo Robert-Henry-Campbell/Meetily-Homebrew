@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  CRASH_REPORT_ISSUE_URL,
   chooseCrashReportDestination,
   createCrashReportZip,
   dismissCrashReport,
@@ -31,6 +32,8 @@ export default function CrashReportDialog({ report, onResolved }: CrashReportDia
   const [mounted, setMounted] = useState(false)
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
   const busy = pendingAction !== null
+  // Without a tracker to send to, the report can only be saved or ignored.
+  const canSend = CRASH_REPORT_ISSUE_URL !== null
 
   useEffect(() => {
     setMounted(true)
@@ -151,11 +154,17 @@ export default function CrashReportDialog({ report, onResolved }: CrashReportDia
             </div>
           </details>
 
-          <p className="text-xs leading-relaxed text-[var(--af-text-3)]">
-            Send Report asks where to save the private ZIP, then opens a public GitHub issue. Opening GitHub contacts GitHub; the ZIP stays local until you choose it as an attachment, which uploads it before issue submission.
-          </p>
+          {canSend ? (
+            <p className="text-xs leading-relaxed text-[var(--af-text-3)]">
+              Send Report asks where to save the private ZIP, then opens a public GitHub issue. Opening GitHub contacts GitHub; the ZIP stays local until you choose it as an attachment, which uploads it before issue submission.
+            </p>
+          ) : (
+            <p className="text-xs leading-relaxed text-[var(--af-text-3)]">
+              Save ZIP asks where to keep the report. Nothing is sent anywhere.
+            </p>
+          )}
 
-          <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-3">
+          <div className={`grid grid-cols-1 gap-2 pt-1 ${canSend ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
             <Button variant="ghost" onClick={handleIgnore} disabled={busy}>
               {pendingAction === 'ignore' && <Spinner className="" />}
               Ignore
@@ -164,10 +173,12 @@ export default function CrashReportDialog({ report, onResolved }: CrashReportDia
               {pendingAction === 'save' ? <Spinner className="" /> : <FileArchive />}
               Save ZIP
             </Button>
-            <Button onClick={handleSend} disabled={busy}>
-              {pendingAction === 'send' ? <Spinner className="" /> : <Send />}
-              Send Report
-            </Button>
+            {canSend && (
+              <Button onClick={handleSend} disabled={busy}>
+                {pendingAction === 'send' ? <Spinner className="" /> : <Send />}
+                Send Report
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>

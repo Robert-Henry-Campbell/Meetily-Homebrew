@@ -3,6 +3,14 @@ import { save } from '@tauri-apps/plugin-dialog'
 
 export type CrashType = 'panic' | 'unexpected_exit'
 
+/**
+ * Where "Send Report" opens a new issue, or null when a build has no place for
+ * reports. Null in this personal build: its crashes come from code the base
+ * project did not write, so that project's tracker is not the place for them,
+ * and this fork has none. The report can still be saved as a ZIP.
+ */
+export const CRASH_REPORT_ISSUE_URL: string | null = null
+
 export interface PendingCrashReport {
   reportId: string
   detectedAt: string
@@ -34,6 +42,7 @@ export async function dismissCrashReport(): Promise<void> {
 }
 
 export async function openCrashReportIssue(report: PendingCrashReport): Promise<void> {
+  if (!CRASH_REPORT_ISSUE_URL) return
   const title = 'Meetily crash report'
   const body = [
     '## Crash report',
@@ -46,6 +55,6 @@ export async function openCrashReportIssue(report: PendingCrashReport): Promise<
   })
 
   await invoke('open_external_url', {
-    url: `https://github.com/TylerBuza/Meetily-ActuallyFree/issues/new?${query.toString()}`,
+    url: `${CRASH_REPORT_ISSUE_URL}?${query.toString()}`,
   })
 }
